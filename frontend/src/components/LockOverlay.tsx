@@ -42,14 +42,18 @@ export function LockOverlay() {
 
   return (
     <div className="absolute inset-0 z-20 grid place-items-center bg-ink/88 p-4 backdrop-blur-md">
-      <div className="w-full max-w-sm rounded-lg border border-line bg-panel p-5 text-center shadow-glow">
-        <div className="mx-auto grid h-14 w-14 place-items-center rounded-lg bg-coral/18">
+      <div className="w-full max-w-md rounded-lg border border-line bg-panel p-5 text-center shadow-glow">
+        <div className="mx-auto grid h-16 w-16 place-items-center rounded-lg bg-coral/18">
           <Lock className="h-7 w-7 text-coral" />
         </div>
-        <h2 className="mt-4 text-xl font-bold">Chat locked</h2>
+        <h2 className="mt-4 text-2xl font-bold">Free minute ended</h2>
         <p className="mt-2 text-sm leading-6 text-white/68">
-          The free minute is over. Resume this room with credits or earn more through a rewarded ad.
+          The room is frozen by the backend timer. Resume with credits, earn through a rewarded ad, or top up your wallet.
         </p>
+        <div className="mt-4 rounded-lg border border-line bg-ink p-3 text-left">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-white/40">Current wallet</p>
+          <p className="mt-1 text-2xl font-black text-gold">{user?.credits ?? 0} credits</p>
+        </div>
         <div className="mt-5 grid gap-3">
           <Button onClick={unlock} disabled={!canUnlock}>
             <Unlock className="h-4 w-4" />

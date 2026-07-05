@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
-import { Clock3, Send, Sparkles } from "lucide-react";
+import { Clock3, MessageSquareDashed, Send, Shield, Sparkles, TimerReset, Zap } from "lucide-react";
 import { api } from "@/lib/api";
 import { getSocket } from "@/lib/socket";
 import type { Message, Room } from "@/lib/types";
@@ -81,11 +81,27 @@ export function ChatViewport() {
 
   if (!room) {
     return (
-      <section className="grid min-h-[520px] place-items-center rounded-lg border border-line bg-panel p-6 text-center">
-        <div>
-          <Sparkles className="mx-auto h-10 w-10 text-mint" />
-          <h2 className="mt-4 text-xl font-bold">Ready when you are</h2>
-          <p className="mt-2 max-w-sm text-sm leading-6 text-white/64">Tap Find Someone and the room will open here instantly.</p>
+      <section className="grid min-h-[calc(100svh-2rem)] place-items-center overflow-hidden rounded-lg border border-line bg-panel p-5 text-center">
+        <div className="max-w-lg">
+          <div className="mx-auto grid h-20 w-20 place-items-center rounded-lg border border-mint/30 bg-mint/10">
+            <MessageSquareDashed className="h-10 w-10 text-mint" />
+          </div>
+          <h2 className="mt-5 text-2xl font-bold">Your next chat opens here</h2>
+          <p className="mt-3 text-sm leading-6 text-white/64">
+            Hit Find Someone to create a live room. The backend starts the free 60-second clock at room creation.
+          </p>
+          <div className="mt-6 grid gap-3 sm:grid-cols-3">
+            {[
+              ["Live matching", Sparkles],
+              ["Server timer", TimerReset],
+              ["Credit unlock", Zap]
+            ].map(([label, Icon]) => (
+              <div key={String(label)} className="rounded-lg border border-line bg-ink p-3">
+                <Icon className="mx-auto h-5 w-5 text-gold" />
+                <p className="mt-2 text-xs font-semibold">{String(label)}</p>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
     );
@@ -93,24 +109,37 @@ export function ChatViewport() {
 
   return (
     <section className="relative grid min-h-[calc(100svh-2rem)] grid-rows-[auto_1fr_auto] overflow-hidden rounded-lg border border-line bg-panel">
-      <header className="flex items-center justify-between gap-3 border-b border-line p-4">
-        <div>
+      <header className="border-b border-line bg-ink/50 p-4">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
           <p className="text-xs uppercase tracking-[0.18em] text-white/42">Live room</p>
-          <h2 className="font-bold">{room.sharedInterests.length ? room.sharedInterests.join(", ") : "Fresh match"}</h2>
+            <h2 className="truncate font-bold">{room.sharedInterests.length ? room.sharedInterests.join(", ") : "Fresh match"}</h2>
+          </div>
+          <div className={`inline-flex h-10 items-center gap-2 rounded-lg px-3 text-sm font-bold ${timeLeft < 10 ? "bg-coral text-white" : "bg-mint text-ink"}`}>
+            <Clock3 className="h-4 w-4" />
+            {displayTimer}
+          </div>
         </div>
-        <div className={`inline-flex h-10 items-center gap-2 rounded-lg px-3 text-sm font-bold ${timeLeft < 10 ? "bg-coral text-white" : "bg-ink text-mint"}`}>
-          <Clock3 className="h-4 w-4" />
-          {displayTimer}
+        <div className="mt-3 flex items-center gap-2 text-xs text-white/55">
+          <Shield className="h-4 w-4 text-gold" />
+          <span>{room.status === "active" ? "Messages are live until the free clock ends." : "Room is locked until credits are used."}</span>
         </div>
       </header>
 
-      <div ref={listRef} className="overflow-y-auto p-4">
+      <div ref={listRef} className="overflow-y-auto bg-[radial-gradient(circle_at_top_right,rgba(83,230,177,0.08),transparent_30%)] p-4">
         <div className="grid gap-3">
+          {messages.length === 0 ? (
+            <div className="mx-auto my-8 max-w-xs rounded-lg border border-line bg-ink/80 p-4 text-center">
+              <Sparkles className="mx-auto h-6 w-6 text-mint" />
+              <p className="mt-2 text-sm font-semibold">Say something before the timer ends</p>
+              <p className="mt-1 text-xs leading-5 text-white/50">Try a shared interest opener. Short and real works best.</p>
+            </div>
+          ) : null}
           {messages.map((message) => {
             const mine = message.sender === user?._id;
             return (
               <div key={message._id} className={`flex ${mine ? "justify-end" : "justify-start"}`}>
-                <div className={`max-w-[78%] rounded-lg px-3 py-2 text-sm leading-6 ${mine ? "bg-mint text-ink" : "bg-ink text-white"}`}>
+                <div className={`max-w-[78%] rounded-lg px-3 py-2 text-sm leading-6 shadow-sm ${mine ? "bg-mint text-ink" : "border border-line bg-ink text-white"}`}>
                   {message.body}
                 </div>
               </div>
