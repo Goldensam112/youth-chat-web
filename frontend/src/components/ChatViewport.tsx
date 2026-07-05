@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
-import { Clock3, MessageSquareDashed, Send, Shield, Sparkles, TimerReset, Zap } from "lucide-react";
+import { Clock3, Flag, MessageSquareDashed, Send, Shield, Sparkles, TimerReset, X, Zap } from "lucide-react";
 import { api } from "@/lib/api";
 import { getSocket } from "@/lib/socket";
 import type { Message, Room } from "@/lib/types";
@@ -13,6 +13,7 @@ export function ChatViewport() {
   const { room, user, messages, timeLeft, typingUser, setRoom, setMessages, addMessage, setTimeLeft, setTypingUser } =
     useChatStore();
   const [body, setBody] = useState("");
+  const [roomNotice, setRoomNotice] = useState("");
   const listRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -79,6 +80,23 @@ export function ChatViewport() {
     getSocket()?.emit("typing", { roomId: room._id, isTyping: value.length > 0 });
   }
 
+  async function reportRoom() {
+    if (!room) return;
+    await api(`/api/rooms/${room._id}/report`, {
+      method: "POST",
+      body: JSON.stringify({ reason: "User reported from chat", details: "Quick report from live room UI." })
+    });
+    setRoomNotice("Report submitted for review.");
+  }
+
+  async function closeRoom() {
+    if (!room) return;
+    await api(`/api/rooms/${room._id}/close`, { method: "POST" });
+    setRoom(null);
+    setMessages([]);
+    setRoomNotice("");
+  }
+
   if (!room) {
     return (
       <section className="grid min-h-[calc(100svh-2rem)] place-items-center overflow-hidden rounded-lg border border-line bg-panel p-5 text-center">
@@ -120,10 +138,21 @@ export function ChatViewport() {
             {displayTimer}
           </div>
         </div>
-        <div className="mt-3 flex items-center gap-2 text-xs text-white/55">
-          <Shield className="h-4 w-4 text-gold" />
-          <span>{room.status === "active" ? "Messages are live until the free clock ends." : "Room is locked until credits are used."}</span>
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2 text-xs text-white/55">
+            <Shield className="h-4 w-4 text-gold" />
+            <span>{room.status === "active" ? "Messages are live until the free clock ends." : "Room is locked until credits are used."}</span>
+          </div>
+          <div className="flex gap-2">
+            <button className="grid h-8 w-8 place-items-center rounded-lg border border-line bg-panel text-white/65 hover:text-white" onClick={reportRoom} title="Report">
+              <Flag className="h-4 w-4" />
+            </button>
+            <button className="grid h-8 w-8 place-items-center rounded-lg border border-line bg-panel text-white/65 hover:text-white" onClick={closeRoom} title="Close room">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
         </div>
+        {roomNotice ? <p className="mt-2 rounded-lg border border-line bg-panel p-2 text-xs text-white/65">{roomNotice}</p> : null}
       </header>
 
       <div ref={listRef} className="overflow-y-auto bg-[radial-gradient(circle_at_top_right,rgba(83,230,177,0.08),transparent_30%)] p-4">

@@ -1,22 +1,61 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { Clapperboard, Compass, CreditCard, Gem, LogOut, MessageCircle, Radar, ShieldCheck, Sparkles, UserRoundCheck, Wallet } from "lucide-react";
 import { api } from "@/lib/api";
-import type { Room, User } from "@/lib/types";
+import type { Room, User, WalletTransaction } from "@/lib/types";
 import { useChatStore } from "@/store/useChatStore";
+import { AdvancedFeatures } from "./AdvancedFeatures";
 import { Button } from "./Button";
 import { CreditPill } from "./CreditPill";
 
 export function Dashboard() {
   const { user, room, queueStatus, setUser, setQueueStatus, setRoom, setTimeLeft, setMessages } = useChatStore();
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [draftBio, setDraftBio] = useState("");
+  const [draftInterests, setDraftInterests] = useState("");
+  const [transactions, setTransactions] = useState<WalletTransaction[]>([]);
+  const [notice, setNotice] = useState("");
+
+  useEffect(() => {
+    if (!user) return;
+    setDraftBio(user.bio);
+    setDraftInterests(user.interests.join(", "));
+    loadTransactions();
+  }, [user?._id]);
 
   async function findMatch() {
+    setNotice("");
     setQueueStatus("queued");
     const res = await api<{ status: "queued" | "matched"; room?: Room; timeLeft?: number }>("/api/match/find", { method: "POST" });
     if (res.status === "matched" && res.room) {
       setRoom(res.room);
       setTimeLeft(res.timeLeft ?? 60);
       setQueueStatus("matched");
+    } else {
+      setNotice("Search queue active. Open incognito and create opposite preference user to match.");
+    }
+  }
+
+  async function cancelSearch() {
+    await api<void>("/api/match/queue", { method: "DELETE" });
+    setQueueStatus("idle");
+    setNotice("Search cancelled.");
+  }
+
+  async function loadTransactions() {
+    const res = await api<{ transactions: WalletTransaction[] }>("/api/wallet/transactions");
+    setTransactions(res.transactions);
+  }
+
+  async function claimDailyBonus() {
+    try {
+      const res = await api<{ user: User }>("/api/wallet/daily-bonus", { method: "POST" });
+      setUser(res.user);
+      setNotice("+5 daily credits added.");
+      await loadTransactions();
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Daily bonus failed.");
     }
   }
 
@@ -27,6 +66,8 @@ export function Dashboard() {
       body: JSON.stringify(session)
     });
     setUser(res.user);
+    setNotice("+20 credits earned from rewarded ad.");
+    await loadTransactions();
   }
 
   async function buyPack() {
@@ -35,6 +76,30 @@ export function Dashboard() {
       body: JSON.stringify({ packageId: "starter_50" })
     });
     setUser(res.user);
+    setNotice("+50 mock purchase credits added.");
+    await loadTransactions();
+  }
+
+  async function saveProfile() {
+    if (!user) return;
+    const interests = draftInterests
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean)
+      .slice(0, 12);
+    const res = await api<{ user: User }>("/api/profile", {
+      method: "PATCH",
+      body: JSON.stringify({
+        name: user.name,
+        bio: draftBio,
+        interests,
+        lookingFor: user.lookingFor,
+        profilePictures: user.profilePictures
+      })
+    });
+    setUser(res.user);
+    setProfileOpen(false);
+    setNotice("Profile updated.");
   }
 
   function logout() {
@@ -85,6 +150,31 @@ export function Dashboard() {
             ))}
           </div>
           <CreditPill credits={user.credits} />
+          <Button variant="secondary" onClick={() => setProfileOpen((open) => !open)}>
+            <UserRoundCheck className="h-4 w-4" />
+            Edit Profile
+          </Button>
+          {profileOpen ? (
+            <div className="grid gap-3 rounded-lg border border-line bg-ink p-3">
+              <label className="grid gap-2 text-xs font-semibold text-white/62">
+                Bio
+                <textarea
+                  className="min-h-20 resize-none rounded-lg border border-line bg-panel p-3 text-sm text-white outline-none focus:border-mint"
+                  value={draftBio}
+                  onChange={(event) => setDraftBio(event.target.value)}
+                />
+              </label>
+              <label className="grid gap-2 text-xs font-semibold text-white/62">
+                Interests, comma separated
+                <input
+                  className="h-11 rounded-lg border border-line bg-panel px-3 text-sm text-white outline-none focus:border-mint"
+                  value={draftInterests}
+                  onChange={(event) => setDraftInterests(event.target.value)}
+                />
+              </label>
+              <Button onClick={saveProfile}>Save Profile</Button>
+            </div>
+          ) : null}
         </div>
       </div>
 
@@ -103,6 +193,12 @@ export function Dashboard() {
           <MessageCircle className="h-4 w-4" />
           {queueStatus === "queued" ? "Finding..." : "Find Someone"}
         </Button>
+        {queueStatus === "queued" ? (
+          <Button className="mt-2 w-full" variant="secondary" onClick={cancelSearch}>
+            Cancel Search
+          </Button>
+        ) : null}
+        {notice ? <p className="mt-3 rounded-lg border border-line bg-ink p-3 text-sm text-white/65">{notice}</p> : null}
       </div>
 
       <div className="rounded-lg border border-line bg-panel p-4">
@@ -126,6 +222,29 @@ export function Dashboard() {
             <p className="mt-2 text-sm font-bold">Buy 50</p>
             <p className="text-xs text-white/45">Mock pack</p>
           </button>
+          <button className="rounded-lg border border-line bg-ink p-3 text-left hover:border-mint" onClick={claimDailyBonus}>
+            <Sparkles className="h-4 w-4 text-mint" />
+            <p className="mt-2 text-sm font-bold">Daily +5</p>
+            <p className="text-xs text-white/45">Once a day</p>
+          </button>
+        </div>
+        <div className="mt-4 max-h-48 overflow-y-auto rounded-lg border border-line bg-ink">
+          {transactions.length ? (
+            transactions.slice(0, 8).map((transaction) => (
+              <div key={transaction._id} className="flex items-center justify-between border-b border-line px-3 py-2 last:border-b-0">
+                <div>
+                  <p className="text-xs font-semibold capitalize">{transaction.type.replace("_", " ")}</p>
+                  <p className="text-[11px] text-white/42">{new Date(transaction.createdAt).toLocaleString()}</p>
+                </div>
+                <p className={`text-sm font-bold ${transaction.direction === "credit" ? "text-mint" : "text-coral"}`}>
+                  {transaction.direction === "credit" ? "+" : "-"}
+                  {transaction.amount}
+                </p>
+              </div>
+            ))
+          ) : (
+            <p className="p-3 text-sm text-white/50">No wallet history yet.</p>
+          )}
         </div>
       </div>
 
@@ -148,6 +267,8 @@ export function Dashboard() {
           <p className="mt-2 text-sm font-semibold">60 sec hook</p>
         </div>
       </div>
+
+      <AdvancedFeatures />
     </aside>
   );
 }

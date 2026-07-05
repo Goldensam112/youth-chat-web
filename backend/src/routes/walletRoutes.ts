@@ -28,6 +28,34 @@ router.post("/ad-session", requireAuth, async (req, res) => {
   res.json({ adSessionId, completedAt, signature });
 });
 
+router.get("/transactions", requireAuth, async (req, res, next) => {
+  try {
+    const transactions = await WalletTransaction.find({ user: req.user!._id }).sort({ createdAt: -1 }).limit(30);
+    res.json({ transactions });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post("/daily-bonus", requireAuth, async (req, res, next) => {
+  try {
+    const startOfDay = new Date();
+    startOfDay.setHours(0, 0, 0, 0);
+    const existing = await WalletTransaction.findOne({
+      user: req.user!._id,
+      type: "ad_reward",
+      "metadata.source": "daily_bonus",
+      createdAt: { $gte: startOfDay }
+    });
+    if (existing) return res.status(409).json({ message: "Daily bonus already claimed" });
+
+    const result = await creditUser(req.user!._id.toString(), 5, "ad_reward", { source: "daily_bonus" });
+    res.json({ user: result.user, transaction: result.transaction });
+  } catch (error) {
+    next(error);
+  }
+});
+
 router.post("/earn-credits", requireAuth, async (req, res, next) => {
   try {
     const input = adSchema.parse(req.body);

@@ -1,7 +1,9 @@
 import { Router } from "express";
+import { z } from "zod";
 import { requireAuth } from "../utils/auth.js";
 import { Room } from "../models/Room.js";
 import { Message } from "../models/Message.js";
+import { SafetyReport } from "../models/SafetyReport.js";
 import { getRoomTimeLeft } from "../utils/timer.js";
 import { unlockRoomWithCredits } from "../services/walletService.js";
 
@@ -33,6 +35,42 @@ router.post("/:roomId/unlock", requireAuth, async (req, res, next) => {
       timeLeft: getRoomTimeLeft(result.room),
       serverTime: new Date().toISOString()
     });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post("/:roomId/report", requireAuth, async (req, res, next) => {
+  try {
+    const room = await Room.findById(String(req.params.roomId));
+    if (!room) throw new Error("Room not found");
+    if (!room.participants.some((participantId) => participantId.toString() === req.user!._id.toString())) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+
+    const schema = z.object({
+      reason: z.string().min(3).max(120),
+      details: z.string().max(500).default("")
+    });
+    const input = schema.parse(req.body);
+    const report = await SafetyReport.create({ room: room._id, reporter: req.user!._id, ...input });
+    res.json({ report });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post("/:roomId/close", requireAuth, async (req, res, next) => {
+  try {
+    const room = await Room.findById(String(req.params.roomId));
+    if (!room) throw new Error("Room not found");
+    if (!room.participants.some((participantId) => participantId.toString() === req.user!._id.toString())) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+
+    room.status = "closed";
+    await room.save();
+    res.json({ room });
   } catch (error) {
     next(error);
   }

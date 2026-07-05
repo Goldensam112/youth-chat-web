@@ -6,6 +6,7 @@ import authRoutes from "./routes/authRoutes.js";
 import matchRoutes from "./routes/matchRoutes.js";
 import roomRoutes from "./routes/roomRoutes.js";
 import walletRoutes from "./routes/walletRoutes.js";
+import profileRoutes from "./routes/profileRoutes.js";
 import { env } from "./config/env.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 
@@ -20,6 +21,7 @@ export function createApp() {
   app.get("/health", (_req, res) => res.json({ ok: true, at: new Date().toISOString() }));
   app.use("/api/auth", authRoutes);
   app.use("/api/match", matchRoutes);
+  app.use("/api/profile", profileRoutes);
   app.use("/api/rooms", roomRoutes);
   app.use("/api/wallet", walletRoutes);
   app.use(errorHandler);

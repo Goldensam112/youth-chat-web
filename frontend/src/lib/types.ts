@@ -32,3 +32,15 @@ export type Message = {
   body: string;
   createdAt: string;
 };
+
+export type WalletTransaction = {
+  _id: string;
+  type: "signup_bonus" | "ad_reward" | "room_unlock" | "purchase";
+  direction: "credit" | "debit";
+  amount: number;
+  balanceAfter: number;
+  provider?: string;
+  externalRef?: string;
+  metadata?: Record<string, unknown>;
+  createdAt: string;
+};
