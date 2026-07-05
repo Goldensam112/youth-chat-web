@@ -1,4 +1,4 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://youth-chat-web.onrender.com";
 
 export function getToken() {
   if (typeof window === "undefined") return null;
