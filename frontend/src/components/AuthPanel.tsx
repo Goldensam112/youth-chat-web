@@ -14,9 +14,11 @@ export function AuthPanel() {
   const [gender, setGender] = useState<Gender>("male");
   const [name, setName] = useState("Aarav");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   async function login() {
     setLoading(true);
+    setError("");
     try {
       const payload = {
         authProvider: "mock",
@@ -40,6 +42,8 @@ export function AuthPanel() {
       });
       setToken(res.token);
       setUser(res.user);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Profile create nahi ho paaya");
     } finally {
       setLoading(false);
     }
@@ -79,6 +83,7 @@ export function AuthPanel() {
         <LogIn className="h-4 w-4" />
         {loading ? "Creating..." : "Continue"}
       </Button>
+      {error ? <p className="rounded-lg border border-coral/40 bg-coral/10 p-3 text-sm text-coral">{error}</p> : null}
     </section>
   );
 }

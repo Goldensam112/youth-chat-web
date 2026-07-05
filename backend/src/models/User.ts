@@ -30,7 +30,9 @@ const userSchema = new mongoose.Schema(
 );
 
 userSchema.index({ authProvider: 1, providerId: 1 }, { unique: true });
-userSchema.index({ gender: 1, lookingFor: 1, interests: 1 });
+userSchema.index({ gender: 1 });
+userSchema.index({ lookingFor: 1 });
+userSchema.index({ interests: 1 });
 
 export type UserDocument = InferSchemaType<typeof userSchema> & { _id: mongoose.Types.ObjectId };
 export const User = mongoose.model("User", userSchema);
