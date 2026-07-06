@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Clapperboard, Compass, CreditCard, Gem, LogOut, MessageCircle, Radar, ShieldCheck, Sparkles, UserRoundCheck, Wallet } from "lucide-react";
 import { api } from "@/lib/api";
 import { loadPopunderOnce, openSmartAd } from "@/lib/adsterra";
@@ -17,6 +18,7 @@ type DashboardProps = {
 };
 
 export function Dashboard({ mobileTab, onOpenChat }: DashboardProps) {
+  const router = useRouter();
   const { user, room, queueStatus, setUser, setQueueStatus, setRoom, setTimeLeft, setMessages } = useChatStore();
   const [profileOpen, setProfileOpen] = useState(false);
   const [draftBio, setDraftBio] = useState("");
@@ -139,6 +141,7 @@ export function Dashboard({ mobileTab, onOpenChat }: DashboardProps) {
     setRoom(null);
     setMessages([]);
     setQueueStatus("idle");
+    router.replace("/login");
   }
 
   if (!user) return null;

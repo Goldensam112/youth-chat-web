@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { ArrowLeft, ArrowRight, BadgeCheck, Gamepad2, Heart, LogIn, MessageCircle, ShieldCheck, Sparkles } from "lucide-react";
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from "firebase/auth";
 import { api, setToken } from "@/lib/api";
@@ -17,6 +18,7 @@ const genderOptions: { value: Gender; label: string }[] = [
 ];
 
 export function AuthPanel() {
+  const router = useRouter();
   const setUser = useChatStore((state) => state.setUser);
   const [step, setStep] = useState(0);
   const [gender, setGender] = useState<Gender>("male");
@@ -92,6 +94,7 @@ export function AuthPanel() {
       });
       setToken(res.token);
       setUser(res.user);
+      router.replace("/");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Profile create nahi ho paaya");
     } finally {

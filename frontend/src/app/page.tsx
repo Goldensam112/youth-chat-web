@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Radio, ShieldCheck } from "lucide-react";
-import { AuthPanel } from "@/components/AuthPanel";
 import { AdRuntime } from "@/components/ads/AdRuntime";
 import { ChatViewport } from "@/components/ChatViewport";
 import { Dashboard } from "@/components/Dashboard";
@@ -13,6 +13,7 @@ import type { Room, User } from "@/lib/types";
 import { useChatStore } from "@/store/useChatStore";
 
 export default function Home() {
+  const router = useRouter();
   const user = useChatStore((state) => state.user);
   const setUser = useChatStore((state) => state.setUser);
   const setRoom = useChatStore((state) => state.setRoom);
@@ -23,13 +24,17 @@ export default function Home() {
   useEffect(() => {
     if (!getToken()) {
       setBooting(false);
+      router.replace("/login");
       return;
     }
     api<{ user: User }>("/api/auth/me")
       .then((res) => setUser(res.user))
-      .catch(() => window.localStorage.removeItem("pulse_token"))
+      .catch(() => {
+        window.localStorage.removeItem("pulse_token");
+        router.replace("/login");
+      })
       .finally(() => setBooting(false));
-  }, [setUser]);
+  }, [router, setUser]);
 
   useEffect(() => {
     if (!user) return;
@@ -83,13 +88,7 @@ export default function Home() {
           </div>
           <MobileShell />
           </>
-        ) : (
-          <div className="grid min-h-[calc(100svh-6rem)] place-items-center">
-            <div className="w-full max-w-6xl">
-              <AuthPanel />
-            </div>
-          </div>
-        )}
+        ) : null}
       </div>
     </main>
   );
