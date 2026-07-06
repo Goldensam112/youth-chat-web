@@ -9,7 +9,7 @@ import { useChatStore } from "@/store/useChatStore";
 import { Button } from "./Button";
 import { LockOverlay } from "./LockOverlay";
 
-export function ChatViewport() {
+export function ChatViewport({ mobile = false }: { mobile?: boolean }) {
   const { room, user, messages, timeLeft, typingUser, setRoom, setMessages, addMessage, setTimeLeft, setTypingUser } =
     useChatStore();
   const [body, setBody] = useState("");
@@ -99,7 +99,7 @@ export function ChatViewport() {
 
   if (!room) {
     return (
-      <section className="grid min-h-[calc(100svh-2rem)] place-items-center overflow-hidden rounded-lg border border-line bg-panel p-5 text-center">
+      <section className={`grid place-items-center overflow-hidden rounded-lg border border-line bg-panel p-5 text-center ${mobile ? "min-h-[calc(100svh-8.5rem)]" : "min-h-[calc(100svh-2rem)]"}`}>
         <div className="max-w-lg">
           <div className="mx-auto grid h-20 w-20 place-items-center rounded-lg border border-mint/30 bg-mint/10">
             <MessageSquareDashed className="h-10 w-10 text-mint" />
@@ -126,11 +126,11 @@ export function ChatViewport() {
   }
 
   return (
-    <section className="relative grid min-h-[calc(100svh-2rem)] grid-rows-[auto_1fr_auto] overflow-hidden rounded-lg border border-line bg-panel">
-      <header className="border-b border-line bg-ink/50 p-4">
+    <section className={`relative grid grid-rows-[auto_1fr_auto] overflow-hidden rounded-lg border border-line bg-panel ${mobile ? "h-[calc(100svh-8.5rem)]" : "min-h-[calc(100svh-2rem)]"}`}>
+      <header className="border-b border-line bg-ink/50 p-3 sm:p-4">
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
-          <p className="text-xs uppercase tracking-[0.18em] text-white/42">Live room</p>
+            <p className="text-xs uppercase tracking-[0.18em] text-white/42">Live room</p>
             <h2 className="truncate font-bold">{room.sharedInterests.length ? room.sharedInterests.join(", ") : "Fresh match"}</h2>
           </div>
           <div className={`inline-flex h-10 items-center gap-2 rounded-lg px-3 text-sm font-bold ${timeLeft < 10 ? "bg-coral text-white" : "bg-mint text-ink"}`}>
@@ -139,9 +139,9 @@ export function ChatViewport() {
           </div>
         </div>
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-2 text-xs text-white/55">
+          <div className="min-w-0 flex-1 items-center gap-2 text-xs text-white/55 sm:flex">
             <Shield className="h-4 w-4 text-gold" />
-            <span>{room.status === "active" ? "Messages are live until the free clock ends." : "Room is locked until credits are used."}</span>
+            <span className="line-clamp-2">{room.status === "active" ? "Messages are live until the free clock ends." : "Room is locked until credits are used."}</span>
           </div>
           <div className="flex gap-2">
             <button className="grid h-8 w-8 place-items-center rounded-lg border border-line bg-panel text-white/65 hover:text-white" onClick={reportRoom} title="Report">

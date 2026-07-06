@@ -8,7 +8,12 @@ import { useChatStore } from "@/store/useChatStore";
 import { Button } from "./Button";
 import { CreditPill } from "./CreditPill";
 
-export function Dashboard() {
+type DashboardProps = {
+  mobileTab?: "discover" | "wallet" | "profile";
+  onOpenChat?: () => void;
+};
+
+export function Dashboard({ mobileTab, onOpenChat }: DashboardProps) {
   const { user, room, queueStatus, setUser, setQueueStatus, setRoom, setTimeLeft, setMessages } = useChatStore();
   const [profileOpen, setProfileOpen] = useState(false);
   const [draftBio, setDraftBio] = useState("");
@@ -31,6 +36,7 @@ export function Dashboard() {
       setRoom(res.room);
       setTimeLeft(res.timeLeft ?? 60);
       setQueueStatus("matched");
+      onOpenChat?.();
     } else {
       setNotice("Searching for someone with a matching vibe...");
     }
@@ -110,10 +116,14 @@ export function Dashboard() {
   }
 
   if (!user) return null;
+  const showAll = !mobileTab;
+  const showProfile = showAll || mobileTab === "profile";
+  const showDiscover = showAll || mobileTab === "discover";
+  const showWallet = showAll || mobileTab === "wallet";
 
   return (
     <aside className="grid content-start gap-4">
-      <div className="overflow-hidden rounded-lg border border-line bg-panel">
+      {showProfile ? <div className="overflow-hidden rounded-lg border border-line bg-panel">
         <div className="bg-[linear-gradient(135deg,rgba(83,230,177,0.18),rgba(255,209,102,0.09))] p-4">
           <div className="flex items-start justify-between gap-3">
             <div className="flex min-w-0 items-center gap-3">
@@ -175,9 +185,9 @@ export function Dashboard() {
             </div>
           ) : null}
         </div>
-      </div>
+      </div> : null}
 
-      <div className="rounded-lg border border-line bg-panel p-4 shadow-glow">
+      {showDiscover ? <div className="rounded-lg border border-line bg-panel p-4 shadow-glow">
         <div className="mb-4 flex items-start justify-between gap-3">
           <div className="flex items-center gap-2">
             <Radar className="h-5 w-5 text-mint" />
@@ -198,9 +208,9 @@ export function Dashboard() {
           </Button>
         ) : null}
         {notice ? <p className="mt-3 rounded-lg border border-line bg-ink p-3 text-sm text-white/65">{notice}</p> : null}
-      </div>
+      </div> : null}
 
-      <div className="rounded-lg border border-line bg-panel p-4">
+      {showWallet ? <div className="rounded-lg border border-line bg-panel p-4">
         <div className="mb-4 flex items-center gap-2">
           <Wallet className="h-5 w-5 text-gold" />
           <h3 className="font-semibold">Wallet</h3>
@@ -245,18 +255,18 @@ export function Dashboard() {
             <p className="p-3 text-sm text-white/50">No wallet history yet.</p>
           )}
         </div>
-      </div>
+      </div> : null}
 
-      <div className="rounded-lg border border-line bg-panel p-4">
+      {showDiscover || showProfile ? <div className="rounded-lg border border-line bg-panel p-4">
         <div className="flex gap-3">
           <ShieldCheck className="mt-1 h-5 w-5 shrink-0 text-gold" />
           <p className="text-sm leading-6 text-white/68">
             Use report or close room any time a conversation does not feel right.
           </p>
         </div>
-      </div>
+      </div> : null}
 
-      <div className="grid grid-cols-2 gap-3">
+      {showDiscover ? <div className="grid grid-cols-2 gap-3">
         <div className="rounded-lg border border-line bg-panel p-3">
           <Compass className="h-4 w-4 text-mint" />
           <p className="mt-2 text-sm font-semibold">Interest match</p>
@@ -265,7 +275,7 @@ export function Dashboard() {
           <Sparkles className="h-4 w-4 text-gold" />
           <p className="mt-2 text-sm font-semibold">60 sec hook</p>
         </div>
-      </div>
+      </div> : null}
     </aside>
   );
 }

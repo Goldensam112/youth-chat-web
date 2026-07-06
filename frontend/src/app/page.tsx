@@ -5,6 +5,7 @@ import { Radio, ShieldCheck } from "lucide-react";
 import { AuthPanel } from "@/components/AuthPanel";
 import { ChatViewport } from "@/components/ChatViewport";
 import { Dashboard } from "@/components/Dashboard";
+import { MobileShell } from "@/components/MobileShell";
 import { api, getToken } from "@/lib/api";
 import type { User } from "@/lib/types";
 import { useChatStore } from "@/store/useChatStore";
@@ -40,10 +41,13 @@ export default function Home() {
         </header>
 
         {user ? (
-          <div className="grid gap-4 lg:grid-cols-[380px_1fr]">
+          <>
+          <div className="hidden gap-4 lg:grid lg:grid-cols-[380px_1fr]">
             <Dashboard />
             <ChatViewport />
           </div>
+          <MobileShell />
+          </>
         ) : (
           <div className="grid min-h-[calc(100svh-6rem)] place-items-center">
             <div className="w-full max-w-6xl">
