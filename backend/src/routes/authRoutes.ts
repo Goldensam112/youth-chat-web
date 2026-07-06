@@ -3,6 +3,7 @@ import { z } from "zod";
 import { User } from "../models/User.js";
 import { signToken, requireAuth } from "../utils/auth.js";
 import { WalletTransaction } from "../models/WalletTransaction.js";
+import { getFirebaseAdmin } from "../config/firebase.js";
 
 const router = Router();
 
@@ -18,6 +19,10 @@ const loginSchema = z.object({
   bio: z.string().max(240).default(""),
   interests: z.array(z.string()).min(1).max(12),
   profilePictures: z.array(z.object({ url: z.string().url(), isPrimary: z.boolean().default(false) })).default([])
+});
+
+const firebaseLoginSchema = loginSchema.omit({ authProvider: true, providerId: true, email: true }).extend({
+  idToken: z.string().min(20)
 });
 
 router.post("/login", async (req, res, next) => {
@@ -37,6 +42,44 @@ router.post("/login", async (req, res, next) => {
       });
     } else {
       user.set({ ...input, interests: normalizedInterests });
+      await user.save();
+    }
+
+    res.json({ token: signToken(user._id.toString()), user });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post("/firebase-login", async (req, res, next) => {
+  try {
+    const input = firebaseLoginSchema.parse(req.body);
+    const decoded = await getFirebaseAdmin().verifyIdToken(input.idToken);
+    const normalizedInterests = input.interests.map((interest) => interest.trim().toLowerCase());
+
+    let user = await User.findOne({ authProvider: "firebase", providerId: decoded.uid });
+    if (!user) {
+      user = await User.create({
+        ...input,
+        authProvider: "firebase",
+        providerId: decoded.uid,
+        email: decoded.email,
+        interests: normalizedInterests,
+        credits: 20
+      });
+      await WalletTransaction.create({
+        user: user._id,
+        type: "signup_bonus",
+        direction: "credit",
+        amount: 20,
+        balanceAfter: user.credits
+      });
+    } else {
+      user.set({
+        ...input,
+        email: decoded.email,
+        interests: normalizedInterests
+      });
       await user.save();
     }
 

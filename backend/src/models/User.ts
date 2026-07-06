@@ -10,7 +10,7 @@ const profileImageSchema = new mongoose.Schema(
 
 const userSchema = new mongoose.Schema(
   {
-    authProvider: { type: String, enum: ["google", "phone", "mock"], required: true },
+    authProvider: { type: String, enum: ["google", "phone", "mock", "firebase"], required: true },
     providerId: { type: String, required: true, index: true },
     phone: { type: String, index: true },
     email: { type: String, lowercase: true, trim: true, index: true },

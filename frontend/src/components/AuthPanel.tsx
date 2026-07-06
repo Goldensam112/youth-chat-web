@@ -2,7 +2,9 @@
 
 import { useState } from "react";
 import { ArrowLeft, ArrowRight, BadgeCheck, Gamepad2, Heart, LogIn, MessageCircle, ShieldCheck, Sparkles } from "lucide-react";
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from "firebase/auth";
 import { api, setToken } from "@/lib/api";
+import { firebaseAuth } from "@/lib/firebase";
 import type { Gender, User } from "@/lib/types";
 import { useChatStore } from "@/store/useChatStore";
 import { Button } from "./Button";
@@ -23,6 +25,9 @@ export function AuthPanel() {
   const [age, setAge] = useState(21);
   const [bio, setBio] = useState("");
   const [interests, setInterests] = useState<string[]>(["gaming", "music", "late night talks"]);
+  const [authMode, setAuthMode] = useState<"signup" | "login">("signup");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -57,9 +62,17 @@ export function AuthPanel() {
     setLoading(true);
     setError("");
     try {
+      if (!email.trim() || password.length < 6) {
+        setError("Email aur 6+ character password zaroori hai.");
+        return;
+      }
+      const credential =
+        authMode === "signup"
+          ? await createUserWithEmailAndPassword(firebaseAuth, email.trim(), password)
+          : await signInWithEmailAndPassword(firebaseAuth, email.trim(), password);
+      const idToken = await credential.user.getIdToken();
       const payload = {
-        authProvider: "mock",
-        providerId: `${gender}-${name.trim().toLowerCase()}-${Date.now()}`,
+        idToken,
         name: name.trim(),
         age,
         gender,
@@ -73,7 +86,7 @@ export function AuthPanel() {
           }
         ]
       };
-      const res = await api<{ token: string; user: User }>("/api/auth/login", {
+      const res = await api<{ token: string; user: User }>("/api/auth/firebase-login", {
         method: "POST",
         body: JSON.stringify(payload)
       });
@@ -218,6 +231,44 @@ export function AuthPanel() {
 
         {step === 2 ? (
           <div className="grid gap-4">
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                className={`h-11 rounded-lg border text-sm font-semibold ${
+                  authMode === "signup" ? "border-mint bg-mint text-ink" : "border-line bg-ink text-white"
+                }`}
+                onClick={() => setAuthMode("signup")}
+              >
+                Sign up
+              </button>
+              <button
+                className={`h-11 rounded-lg border text-sm font-semibold ${
+                  authMode === "login" ? "border-mint bg-mint text-ink" : "border-line bg-ink text-white"
+                }`}
+                onClick={() => setAuthMode("login")}
+              >
+                Login
+              </button>
+            </div>
+            <label className="grid gap-2 text-sm font-semibold">
+              Email
+              <input
+                className="h-12 rounded-lg border border-line bg-ink px-3 font-normal outline-none focus:border-mint"
+                type="email"
+                placeholder="you@example.com"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+              />
+            </label>
+            <label className="grid gap-2 text-sm font-semibold">
+              Password
+              <input
+                className="h-12 rounded-lg border border-line bg-ink px-3 font-normal outline-none focus:border-mint"
+                type="password"
+                placeholder="Minimum 6 characters"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+              />
+            </label>
             <div className="flex items-center gap-2">
               <Gamepad2 className="h-5 w-5 text-mint" />
               <p className="font-semibold">Pick up to 8 interests</p>
