@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Radio, ShieldCheck } from "lucide-react";
 import { AuthPanel } from "@/components/AuthPanel";
 import { ChatViewport } from "@/components/ChatViewport";
@@ -13,12 +13,17 @@ import { useChatStore } from "@/store/useChatStore";
 export default function Home() {
   const user = useChatStore((state) => state.user);
   const setUser = useChatStore((state) => state.setUser);
+  const [booting, setBooting] = useState(true);
 
   useEffect(() => {
-    if (!getToken()) return;
+    if (!getToken()) {
+      setBooting(false);
+      return;
+    }
     api<{ user: User }>("/api/auth/me")
       .then((res) => setUser(res.user))
-      .catch(() => window.localStorage.removeItem("pulse_token"));
+      .catch(() => window.localStorage.removeItem("pulse_token"))
+      .finally(() => setBooting(false));
   }, [setUser]);
 
   return (
@@ -40,7 +45,14 @@ export default function Home() {
           </div>
         </header>
 
-        {user ? (
+        {booting ? (
+          <div className="grid min-h-[calc(100svh-6rem)] place-items-center">
+            <div className="w-full max-w-sm rounded-lg border border-line bg-panel p-5 text-center shadow-glow">
+              <div className="mx-auto h-10 w-10 animate-pulse rounded-lg bg-mint" />
+              <p className="mt-4 font-semibold">Opening your account...</p>
+            </div>
+          </div>
+        ) : user ? (
           <>
           <div className="hidden gap-4 lg:grid lg:grid-cols-[380px_1fr]">
             <Dashboard />
