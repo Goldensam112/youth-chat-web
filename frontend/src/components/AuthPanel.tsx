@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowLeft, ArrowRight, BadgeCheck, Gamepad2, Heart, LogIn, MessageCircle, Phone, ShieldCheck, Sparkles } from "lucide-react";
+import { ArrowLeft, ArrowRight, BadgeCheck, Gamepad2, Heart, LogIn, MessageCircle, ShieldCheck, Sparkles } from "lucide-react";
 import { api, setToken } from "@/lib/api";
 import type { Gender, User } from "@/lib/types";
 import { useChatStore } from "@/store/useChatStore";
@@ -138,7 +138,7 @@ export function AuthPanel() {
               />
               <div>
                 <p className="font-semibold">{name || "Your profile"}</p>
-                <p className="mt-1 text-sm text-white/55">Profile photo is auto-generated for demo mode.</p>
+                <p className="mt-1 text-sm text-white/55">This is how others will see you.</p>
               </div>
             </div>
             <label className="grid gap-2 text-sm font-semibold">
@@ -234,16 +234,6 @@ export function AuthPanel() {
                   {interest}
                 </button>
               ))}
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <button className="flex h-12 items-center justify-center gap-2 rounded-lg border border-line bg-ink text-sm font-semibold text-white/72">
-                <Phone className="h-4 w-4" />
-                Phone OTP
-              </button>
-              <button className="flex h-12 items-center justify-center gap-2 rounded-lg border border-line bg-ink text-sm font-semibold text-white/72">
-                <LogIn className="h-4 w-4" />
-                Google
-              </button>
             </div>
           </div>
         ) : null}

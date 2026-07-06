@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { BadgeCheck, Radio } from "lucide-react";
+import { Radio, ShieldCheck } from "lucide-react";
 import { AuthPanel } from "@/components/AuthPanel";
 import { ChatViewport } from "@/components/ChatViewport";
 import { Dashboard } from "@/components/Dashboard";
@@ -34,8 +34,8 @@ export default function Home() {
             </div>
           </div>
           <div className="hidden items-center gap-2 rounded-lg border border-line bg-ink px-3 py-2 text-xs font-semibold text-white/70 sm:flex">
-            <BadgeCheck className="h-4 w-4 text-mint" />
-            MVP Live
+            <ShieldCheck className="h-4 w-4 text-mint" />
+            Private chat
           </div>
         </header>
 

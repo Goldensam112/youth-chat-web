@@ -5,7 +5,6 @@ import { Clapperboard, Compass, CreditCard, Gem, LogOut, MessageCircle, Radar, S
 import { api } from "@/lib/api";
 import type { Room, User, WalletTransaction } from "@/lib/types";
 import { useChatStore } from "@/store/useChatStore";
-import { AdvancedFeatures } from "./AdvancedFeatures";
 import { Button } from "./Button";
 import { CreditPill } from "./CreditPill";
 
@@ -33,7 +32,7 @@ export function Dashboard() {
       setTimeLeft(res.timeLeft ?? 60);
       setQueueStatus("matched");
     } else {
-      setNotice("Search queue active. Open incognito and create opposite preference user to match.");
+      setNotice("Searching for someone with a matching vibe...");
     }
   }
 
@@ -76,7 +75,7 @@ export function Dashboard() {
       body: JSON.stringify({ packageId: "starter_50" })
     });
     setUser(res.user);
-    setNotice("+50 mock purchase credits added.");
+    setNotice("+50 credits added to your wallet.");
     await loadTransactions();
   }
 
@@ -188,7 +187,7 @@ export function Dashboard() {
             {queueStatus === "queued" ? "Searching" : room ? "In room" : "Idle"}
           </span>
         </div>
-        <p className="mb-4 text-sm leading-6 text-white/62">Find a compatible user by gender preference and shared tags. Open another browser/incognito profile to test matching.</p>
+        <p className="mb-4 text-sm leading-6 text-white/62">Find someone based on your preferences and shared interests.</p>
         <Button className="w-full" onClick={findMatch} disabled={queueStatus === "queued"}>
           <MessageCircle className="h-4 w-4" />
           {queueStatus === "queued" ? "Finding..." : "Find Someone"}
@@ -220,7 +219,7 @@ export function Dashboard() {
           <button className="rounded-lg border border-line bg-ink p-3 text-left hover:border-mint" onClick={buyPack}>
             <CreditCard className="h-4 w-4 text-coral" />
             <p className="mt-2 text-sm font-bold">Buy 50</p>
-            <p className="text-xs text-white/45">Mock pack</p>
+            <p className="text-xs text-white/45">Credit pack</p>
           </button>
           <button className="rounded-lg border border-line bg-ink p-3 text-left hover:border-mint" onClick={claimDailyBonus}>
             <Sparkles className="h-4 w-4 text-mint" />
@@ -252,7 +251,7 @@ export function Dashboard() {
         <div className="flex gap-3">
           <ShieldCheck className="mt-1 h-5 w-5 shrink-0 text-gold" />
           <p className="text-sm leading-6 text-white/68">
-            Safety controls are designed into the data model. Add report, block, moderation queue, and real verification before public scale.
+            Use report or close room any time a conversation does not feel right.
           </p>
         </div>
       </div>
@@ -267,8 +266,6 @@ export function Dashboard() {
           <p className="mt-2 text-sm font-semibold">60 sec hook</p>
         </div>
       </div>
-
-      <AdvancedFeatures />
     </aside>
   );
 }
