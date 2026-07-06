@@ -4,6 +4,7 @@ import { env } from "../config/env.js";
 import { Message } from "../models/Message.js";
 import { Room } from "../models/Room.js";
 import { User } from "../models/User.js";
+import { setSocketServer } from "./notifier.js";
 import { getRoomTimeLeft, isRoomExpired } from "../utils/timer.js";
 
 type SocketUser = {
@@ -28,6 +29,8 @@ async function lockExpiredRoom(io: Server, roomId: string) {
 }
 
 export function registerSocketHandlers(io: Server) {
+  setSocketServer(io);
+
   io.use(async (socket, next) => {
     try {
       const token = socket.handshake.auth.token as string | undefined;
@@ -44,6 +47,7 @@ export function registerSocketHandlers(io: Server) {
 
   io.on("connection", async (socket) => {
     const userId = socket.user!.id;
+    socket.join(`user:${userId}`);
     await User.findByIdAndUpdate(userId, { isOnline: true, lastSeenAt: new Date() });
     socket.broadcast.emit("presence_update", { userId, isOnline: true });
 

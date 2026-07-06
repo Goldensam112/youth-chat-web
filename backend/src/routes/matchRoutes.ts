@@ -21,9 +21,13 @@ router.post("/find", requireAuth, async (req, res, next) => {
   }
 });
 
-router.delete("/queue", requireAuth, async (req, res) => {
-  removeFromQueue(req.user!._id.toString());
-  res.status(204).send();
+router.delete("/queue", requireAuth, async (req, res, next) => {
+  try {
+    await removeFromQueue(req.user!._id.toString());
+    res.status(204).send();
+  } catch (error) {
+    next(error);
+  }
 });
 
 export default router;

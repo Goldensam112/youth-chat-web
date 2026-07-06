@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import { useEffect } from "react";
 import { MessageCircle, Radar, UserRound, Wallet } from "lucide-react";
+import { useChatStore } from "@/store/useChatStore";
 import { ChatViewport } from "./ChatViewport";
 import { Dashboard } from "./Dashboard";
 
@@ -16,6 +18,11 @@ const navItems: { id: MobileTab; label: string; icon: typeof Radar }[] = [
 
 export function MobileShell() {
   const [tab, setTab] = useState<MobileTab>("discover");
+  const room = useChatStore((state) => state.room);
+
+  useEffect(() => {
+    if (room) setTab("chat");
+  }, [room?._id]);
 
   return (
     <div className="lg:hidden">

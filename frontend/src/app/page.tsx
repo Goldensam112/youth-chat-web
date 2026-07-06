@@ -7,12 +7,16 @@ import { ChatViewport } from "@/components/ChatViewport";
 import { Dashboard } from "@/components/Dashboard";
 import { MobileShell } from "@/components/MobileShell";
 import { api, getToken } from "@/lib/api";
-import type { User } from "@/lib/types";
+import { getSocket } from "@/lib/socket";
+import type { Room, User } from "@/lib/types";
 import { useChatStore } from "@/store/useChatStore";
 
 export default function Home() {
   const user = useChatStore((state) => state.user);
   const setUser = useChatStore((state) => state.setUser);
+  const setRoom = useChatStore((state) => state.setRoom);
+  const setTimeLeft = useChatStore((state) => state.setTimeLeft);
+  const setQueueStatus = useChatStore((state) => state.setQueueStatus);
   const [booting, setBooting] = useState(true);
 
   useEffect(() => {
@@ -25,6 +29,23 @@ export default function Home() {
       .catch(() => window.localStorage.removeItem("pulse_token"))
       .finally(() => setBooting(false));
   }, [setUser]);
+
+  useEffect(() => {
+    if (!user) return;
+    const socket = getSocket();
+    if (!socket) return;
+
+    const handleMatchFound = ({ room, timeLeft }: { room: Room; timeLeft: number }) => {
+      setRoom(room);
+      setTimeLeft(timeLeft);
+      setQueueStatus("matched");
+    };
+
+    socket.on("match_found", handleMatchFound);
+    return () => {
+      socket.off("match_found", handleMatchFound);
+    };
+  }, [user, setQueueStatus, setRoom, setTimeLeft]);
 
   return (
     <main className="safe-shell bg-[radial-gradient(circle_at_top_left,_rgba(83,230,177,0.16),_transparent_34%),radial-gradient(circle_at_bottom_right,_rgba(255,111,97,0.1),_transparent_28%),#07090f] p-3 sm:p-4">
