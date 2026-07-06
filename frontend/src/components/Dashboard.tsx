@@ -3,8 +3,11 @@
 import { useEffect, useState } from "react";
 import { Clapperboard, Compass, CreditCard, Gem, LogOut, MessageCircle, Radar, ShieldCheck, Sparkles, UserRoundCheck, Wallet } from "lucide-react";
 import { api } from "@/lib/api";
+import { loadPopunderOnce, openSmartAd } from "@/lib/adsterra";
 import type { Room, User, WalletTransaction } from "@/lib/types";
 import { useChatStore } from "@/store/useChatStore";
+import { BannerAd } from "./ads/BannerAd";
+import { NativeAd } from "./ads/NativeAd";
 import { Button } from "./Button";
 import { CreditPill } from "./CreditPill";
 
@@ -86,6 +89,8 @@ export function Dashboard({ mobileTab, onOpenChat }: DashboardProps) {
   }
 
   async function watchAd() {
+    openSmartAd();
+    loadPopunderOnce();
     const session = await api<{ adSessionId: string; completedAt: string; signature: string }>("/api/wallet/ad-session", { method: "POST" });
     const res = await api<{ user: User }>("/api/wallet/earn-credits", {
       method: "POST",
@@ -231,6 +236,8 @@ export function Dashboard({ mobileTab, onOpenChat }: DashboardProps) {
         {notice ? <p className="mt-3 rounded-lg border border-line bg-ink p-3 text-sm text-white/65">{notice}</p> : null}
       </div> : null}
 
+      {showDiscover ? <NativeAd /> : null}
+
       {showWallet ? <div className="rounded-lg border border-line bg-panel p-4">
         <div className="mb-4 flex items-center gap-2">
           <Wallet className="h-5 w-5 text-gold" />
@@ -275,6 +282,9 @@ export function Dashboard({ mobileTab, onOpenChat }: DashboardProps) {
           ) : (
             <p className="p-3 text-sm text-white/50">No wallet history yet.</p>
           )}
+        </div>
+        <div className="mt-4">
+          <BannerAd />
         </div>
       </div> : null}
 

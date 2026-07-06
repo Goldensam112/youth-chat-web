@@ -2,8 +2,10 @@
 
 import { Clapperboard, CreditCard, Lock, Unlock } from "lucide-react";
 import { api } from "@/lib/api";
+import { loadPopunderOnce, openSmartAd } from "@/lib/adsterra";
 import type { Room, User } from "@/lib/types";
 import { useChatStore } from "@/store/useChatStore";
+import { BannerAd } from "./ads/BannerAd";
 import { Button } from "./Button";
 
 export function LockOverlay() {
@@ -11,6 +13,8 @@ export function LockOverlay() {
   if (!room || room.status !== "locked") return null;
 
   async function watchAd() {
+    openSmartAd();
+    loadPopunderOnce();
     const session = await api<{ adSessionId: string; completedAt: string; signature: string }>("/api/wallet/ad-session", {
       method: "POST"
     });
@@ -67,6 +71,9 @@ export function LockOverlay() {
             <CreditCard className="h-4 w-4" />
             Buy Credits Pack
           </Button>
+        </div>
+        <div className="mt-4">
+          <BannerAd />
         </div>
       </div>
     </div>
