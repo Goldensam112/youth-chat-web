@@ -3,6 +3,8 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Radio, ShieldCheck } from "lucide-react";
+import { BannerAd } from "@/components/ads/BannerAd";
+import { NativeAd } from "@/components/ads/NativeAd";
 import { AuthPanel } from "@/components/AuthPanel";
 import { api, getToken } from "@/lib/api";
 import type { User } from "@/lib/types";
@@ -42,8 +44,10 @@ export default function LoginPage() {
         </header>
 
         <div className="grid min-h-[calc(100svh-6rem)] place-items-center">
-          <div className="w-full max-w-6xl">
+          <div className="grid w-full max-w-6xl gap-4">
+            <BannerAd />
             <AuthPanel />
+            <NativeAd />
           </div>
         </div>
       </div>

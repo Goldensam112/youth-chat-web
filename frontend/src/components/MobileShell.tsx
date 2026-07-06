@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useEffect } from "react";
 import { MessageCircle, Radar, UserRound, Wallet } from "lucide-react";
 import { useChatStore } from "@/store/useChatStore";
+import { BannerAd } from "./ads/BannerAd";
 import { ChatViewport } from "./ChatViewport";
 import { Dashboard } from "./Dashboard";
 
@@ -27,6 +28,7 @@ export function MobileShell() {
   return (
     <div className="lg:hidden">
       <div className="pb-20">
+        {tab !== "chat" ? <div className="mb-3"><BannerAd /></div> : null}
         {tab === "chat" ? (
           <ChatViewport mobile />
         ) : (

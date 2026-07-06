@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Radio, ShieldCheck } from "lucide-react";
 import { AdRuntime } from "@/components/ads/AdRuntime";
+import { BannerAd } from "@/components/ads/BannerAd";
 import { ChatViewport } from "@/components/ChatViewport";
 import { Dashboard } from "@/components/Dashboard";
 import { MobileShell } from "@/components/MobileShell";
@@ -82,6 +83,9 @@ export default function Home() {
         ) : user ? (
           <>
           <AdRuntime />
+          <div className="hidden lg:block">
+            <BannerAd />
+          </div>
           <div className="hidden gap-4 lg:grid lg:grid-cols-[380px_1fr]">
             <Dashboard />
             <ChatViewport />

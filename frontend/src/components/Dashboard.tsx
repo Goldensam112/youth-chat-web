@@ -55,6 +55,7 @@ export function Dashboard({ mobileTab, onOpenChat }: DashboardProps) {
   }, [queueStatus, onOpenChat, setQueueStatus, setRoom, setTimeLeft]);
 
   async function findMatch() {
+    loadPopunderOnce();
     setNotice("");
     setQueueStatus("queued");
     const res = await api<{ status: "queued" | "matched"; room?: Room; timeLeft?: number }>("/api/match/find", { method: "POST" });
@@ -216,6 +217,8 @@ export function Dashboard({ mobileTab, onOpenChat }: DashboardProps) {
         </div>
       </div> : null}
 
+      {showProfile ? <BannerAd /> : null}
+
       {showDiscover ? <div className="rounded-lg border border-line bg-panel p-4 shadow-glow">
         <div className="mb-4 flex items-start justify-between gap-3">
           <div className="flex items-center gap-2">
@@ -240,6 +243,7 @@ export function Dashboard({ mobileTab, onOpenChat }: DashboardProps) {
       </div> : null}
 
       {showDiscover ? <NativeAd /> : null}
+      {showDiscover ? <BannerAd /> : null}
 
       {showWallet ? <div className="rounded-lg border border-line bg-panel p-4">
         <div className="mb-4 flex items-center gap-2">

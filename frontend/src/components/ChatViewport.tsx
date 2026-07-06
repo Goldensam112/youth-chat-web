@@ -6,6 +6,8 @@ import { api } from "@/lib/api";
 import { getSocket } from "@/lib/socket";
 import type { Message, Room } from "@/lib/types";
 import { useChatStore } from "@/store/useChatStore";
+import { BannerAd } from "./ads/BannerAd";
+import { NativeAd } from "./ads/NativeAd";
 import { Button } from "./Button";
 import { LockOverlay } from "./LockOverlay";
 
@@ -142,6 +144,12 @@ export function ChatViewport({ mobile = false }: { mobile?: boolean }) {
               </div>
             ))}
           </div>
+          <div className="mt-5">
+            <BannerAd />
+          </div>
+          <div className="mt-4">
+            <NativeAd />
+          </div>
         </div>
       </section>
     );
@@ -176,6 +184,9 @@ export function ChatViewport({ mobile = false }: { mobile?: boolean }) {
         </div>
         {roomNotice ? <p className="mt-2 rounded-lg border border-line bg-panel p-2 text-xs text-white/65">{roomNotice}</p> : null}
       </header>
+      <div className="border-b border-line bg-panel p-2">
+        <BannerAd />
+      </div>
 
       <div ref={listRef} className="overflow-y-auto bg-[radial-gradient(circle_at_top_right,rgba(83,230,177,0.08),transparent_30%)] p-4">
         <div className="grid gap-3">
@@ -198,6 +209,10 @@ export function ChatViewport({ mobile = false }: { mobile?: boolean }) {
           })}
           {typingUser && typingUser !== user?._id ? <p className="text-xs text-white/48">Typing...</p> : null}
         </div>
+      </div>
+
+      <div className="border-t border-line bg-panel p-2">
+        <BannerAd />
       </div>
 
       <form onSubmit={submit} className="flex gap-2 border-t border-line p-3">
