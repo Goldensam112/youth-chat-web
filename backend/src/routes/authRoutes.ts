@@ -74,11 +74,9 @@ router.post("/firebase-login", async (req, res, next) => {
         amount: 20,
         balanceAfter: user.credits
       });
-    } else {
+    } else if (!user.email) {
       user.set({
-        ...input,
-        email: decoded.email,
-        interests: normalizedInterests
+        email: decoded.email
       });
       await user.save();
     }

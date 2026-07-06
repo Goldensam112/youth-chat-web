@@ -45,6 +45,7 @@ export function AuthPanel() {
 
   function nextStep() {
     setError("");
+    if (authMode === "login") return;
     if (step === 0 && name.trim().length < 2) {
       setError("Naam kam se kam 2 letters ka hona chahiye.");
       return;
@@ -73,14 +74,15 @@ export function AuthPanel() {
           ? await createUserWithEmailAndPassword(firebaseAuth, email.trim(), password)
           : await signInWithEmailAndPassword(firebaseAuth, email.trim(), password);
       const idToken = await credential.user.getIdToken();
+      const isLogin = authMode === "login";
       const payload = {
         idToken,
-        name: name.trim(),
+        name: isLogin ? credential.user.displayName || email.split("@")[0] : name.trim(),
         age,
         gender,
         lookingFor,
-        bio: bio.trim() || "Here for quick, real conversations.",
-        interests,
+        bio: isLogin ? "Here for quick, real conversations." : bio.trim() || "Here for quick, real conversations.",
+        interests: isLogin ? ["music"] : interests,
         profilePictures: [
           {
             url: `https://api.dicebear.com/9.x/notionists/svg?seed=${encodeURIComponent(name || "pulse")}`,
@@ -135,16 +137,63 @@ export function AuthPanel() {
 
       <div className="grid gap-5 p-5 sm:p-7">
         <div>
-          <p className="text-sm font-semibold text-mint">Step {step + 1} of 3</p>
-          <h2 className="mt-2 text-2xl font-bold">{step === 0 ? "Create your profile" : step === 1 ? "Set your match preference" : "Choose your vibe"}</h2>
-          <div className="mt-4 grid grid-cols-3 gap-2">
-            {[0, 1, 2].map((item) => (
-              <div key={item} className={`h-1.5 rounded-full ${item <= step ? "bg-mint" : "bg-line"}`} />
-            ))}
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              className={`h-11 rounded-lg border text-sm font-semibold ${
+                authMode === "login" ? "border-mint bg-mint text-ink" : "border-line bg-ink text-white"
+              }`}
+              onClick={() => setAuthMode("login")}
+            >
+              Login
+            </button>
+            <button
+              className={`h-11 rounded-lg border text-sm font-semibold ${
+                authMode === "signup" ? "border-mint bg-mint text-ink" : "border-line bg-ink text-white"
+              }`}
+              onClick={() => setAuthMode("signup")}
+            >
+              Create account
+            </button>
           </div>
+          <p className="mt-5 text-sm font-semibold text-mint">{authMode === "login" ? "Welcome back" : `Step ${step + 1} of 3`}</p>
+          <h2 className="mt-2 text-2xl font-bold">
+            {authMode === "login" ? "Login to continue" : step === 0 ? "Create your profile" : step === 1 ? "Set your match preference" : "Choose your vibe"}
+          </h2>
+          {authMode === "signup" ? (
+            <div className="mt-4 grid grid-cols-3 gap-2">
+              {[0, 1, 2].map((item) => (
+                <div key={item} className={`h-1.5 rounded-full ${item <= step ? "bg-mint" : "bg-line"}`} />
+              ))}
+            </div>
+          ) : null}
         </div>
 
-        {step === 0 ? (
+        {authMode === "login" ? (
+          <div className="grid gap-4">
+            <label className="grid gap-2 text-sm font-semibold">
+              Email
+              <input
+                className="h-12 rounded-lg border border-line bg-ink px-3 font-normal outline-none focus:border-mint"
+                type="email"
+                placeholder="you@example.com"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+              />
+            </label>
+            <label className="grid gap-2 text-sm font-semibold">
+              Password
+              <input
+                className="h-12 rounded-lg border border-line bg-ink px-3 font-normal outline-none focus:border-mint"
+                type="password"
+                placeholder="Your password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+              />
+            </label>
+          </div>
+        ) : null}
+
+        {authMode === "signup" && step === 0 ? (
           <div className="grid gap-4">
             <div className="grid grid-cols-[72px_1fr] items-center gap-4 rounded-lg border border-line bg-ink p-3">
               <img
@@ -189,7 +238,7 @@ export function AuthPanel() {
           </div>
         ) : null}
 
-        {step === 1 ? (
+        {authMode === "signup" && step === 1 ? (
           <div className="grid gap-5">
             <div>
               <p className="mb-2 text-sm font-semibold">I am</p>
@@ -232,26 +281,8 @@ export function AuthPanel() {
           </div>
         ) : null}
 
-        {step === 2 ? (
+        {authMode === "signup" && step === 2 ? (
           <div className="grid gap-4">
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                className={`h-11 rounded-lg border text-sm font-semibold ${
-                  authMode === "signup" ? "border-mint bg-mint text-ink" : "border-line bg-ink text-white"
-                }`}
-                onClick={() => setAuthMode("signup")}
-              >
-                Sign up
-              </button>
-              <button
-                className={`h-11 rounded-lg border text-sm font-semibold ${
-                  authMode === "login" ? "border-mint bg-mint text-ink" : "border-line bg-ink text-white"
-                }`}
-                onClick={() => setAuthMode("login")}
-              >
-                Login
-              </button>
-            </div>
             <label className="grid gap-2 text-sm font-semibold">
               Email
               <input
@@ -295,10 +326,15 @@ export function AuthPanel() {
         {error ? <p className="rounded-lg border border-coral/40 bg-coral/10 p-3 text-sm text-coral">{error}</p> : null}
 
         <div className="grid grid-cols-[auto_1fr] gap-3">
-          <Button variant="secondary" onClick={() => setStep((current) => Math.max(0, current - 1))} disabled={step === 0 || loading} title="Back">
+          <Button variant="secondary" onClick={() => setStep((current) => Math.max(0, current - 1))} disabled={authMode === "login" || step === 0 || loading} title="Back">
             <ArrowLeft className="h-4 w-4" />
           </Button>
-          {step < 2 ? (
+          {authMode === "login" ? (
+            <Button onClick={login} disabled={loading}>
+              <LogIn className="h-4 w-4" />
+              {loading ? "Logging in..." : "Login"}
+            </Button>
+          ) : step < 2 ? (
             <Button onClick={nextStep}>
               Continue
               <ArrowRight className="h-4 w-4" />
