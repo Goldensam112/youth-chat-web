@@ -14,43 +14,55 @@ export function ChatViewport({ mobile = false }: { mobile?: boolean }) {
     useChatStore();
   const [body, setBody] = useState("");
   const [roomNotice, setRoomNotice] = useState("");
+  const [sending, setSending] = useState(false);
   const listRef = useRef<HTMLDivElement | null>(null);
+  const roomId = room?._id;
 
   useEffect(() => {
-    if (!room) return;
-    api<{ room: Room; messages: Message[]; timeLeft: number }>(`/api/rooms/${room._id}`).then((res) => {
+    if (!roomId) return;
+    api<{ room: Room; messages: Message[]; timeLeft: number }>(`/api/rooms/${roomId}`).then((res) => {
       setRoom(res.room);
       setMessages(res.messages);
       setTimeLeft(res.timeLeft);
     });
-  }, [room?._id, setMessages, setRoom, setTimeLeft]);
+  }, [roomId, setMessages, setRoom, setTimeLeft]);
 
   useEffect(() => {
-    if (!room) return;
+    if (!roomId) return;
     const socket = getSocket();
     if (!socket) return;
 
-    socket.emit("join_room", { roomId: room._id }, (res: { ok: boolean; timeLeft: number; status: Room["status"] }) => {
+    socket.emit("join_room", { roomId }, (res: { ok: boolean; timeLeft: number; status: Room["status"] }) => {
       if (res.ok) {
         setTimeLeft(res.timeLeft);
-        setRoom({ ...room, status: res.status });
+        useChatStore.setState((state) => (state.room ? { room: { ...state.room, status: res.status } } : state));
       }
     });
 
-    socket.on("message:new", ({ message }: { message: Message }) => addMessage(message));
-    socket.on("timer_update", ({ timeLeft: nextTimeLeft }: { timeLeft: number }) => setTimeLeft(nextTimeLeft));
-    socket.on("room_lock", () => setRoom({ ...room, status: "locked" }));
-    socket.on("typing", ({ userId, isTyping }: { userId: string; isTyping: boolean }) => {
+    const handleMessage = ({ message }: { message: Message }) => addMessage(message);
+    const handleTimer = ({ roomId: eventRoomId, timeLeft: nextTimeLeft }: { roomId: string; timeLeft: number }) => {
+      if (eventRoomId === roomId) setTimeLeft(nextTimeLeft);
+    };
+    const handleLock = ({ roomId: eventRoomId }: { roomId: string }) => {
+      if (eventRoomId !== roomId) return;
+      useChatStore.setState((state) => (state.room ? { room: { ...state.room, status: "locked" } } : state));
+    };
+    const handleTyping = ({ userId, isTyping }: { userId: string; isTyping: boolean }) => {
       setTypingUser(isTyping ? userId : null);
-    });
+    };
+
+    socket.on("message:new", handleMessage);
+    socket.on("timer_update", handleTimer);
+    socket.on("room_lock", handleLock);
+    socket.on("typing", handleTyping);
 
     return () => {
-      socket.off("message:new");
-      socket.off("timer_update");
-      socket.off("room_lock");
-      socket.off("typing");
+      socket.off("message:new", handleMessage);
+      socket.off("timer_update", handleTimer);
+      socket.off("room_lock", handleLock);
+      socket.off("typing", handleTyping);
     };
-  }, [room?._id, addMessage, room, setRoom, setTimeLeft, setTypingUser]);
+  }, [roomId, addMessage, setTimeLeft, setTypingUser]);
 
   useEffect(() => {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" });
@@ -66,12 +78,22 @@ export function ChatViewport({ mobile = false }: { mobile?: boolean }) {
 
   function submit(event: FormEvent) {
     event.preventDefault();
-    if (!room || !body.trim() || room.status !== "active") return;
+    if (!room || sending || !body.trim() || room.status !== "active") return;
     const socket = getSocket();
-    socket?.emit("send_message", { roomId: room._id, body }, (res: { ok: boolean; message?: string }) => {
-      if (!res.ok) console.warn(res.message);
-    });
+    if (!socket) {
+      setRoomNotice("Connection is not ready. Please try again.");
+      return;
+    }
+    const messageBody = body.trim();
+    setSending(true);
     setBody("");
+    socket.emit("send_message", { roomId: room._id, body: messageBody }, (res: { ok: boolean; message?: string }) => {
+      setSending(false);
+      if (!res.ok) {
+        setRoomNotice(res.message ?? "Message could not be sent.");
+        setBody(messageBody);
+      }
+    });
   }
 
   function emitTyping(value: string) {
@@ -186,7 +208,7 @@ export function ChatViewport({ mobile = false }: { mobile?: boolean }) {
           placeholder={room.status === "locked" ? "Chat is locked" : "Type a message"}
           disabled={room.status === "locked"}
         />
-        <Button className="aspect-square px-0" disabled={room.status === "locked" || !body.trim()} title="Send">
+        <Button className="aspect-square px-0" disabled={sending || room.status === "locked" || !body.trim()} title="Send">
           <Send className="h-4 w-4" />
         </Button>
       </form>

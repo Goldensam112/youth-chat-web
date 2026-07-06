@@ -27,7 +27,11 @@ export const useChatStore = create<ChatState>((set) => ({
   setUser: (user) => set({ user }),
   setRoom: (room) => set({ room }),
   setMessages: (messages) => set({ messages }),
-  addMessage: (message) => set((state) => ({ messages: [...state.messages, message] })),
+  addMessage: (message) =>
+    set((state) => {
+      if (state.messages.some((existing) => existing._id === message._id)) return state;
+      return { messages: [...state.messages, message] };
+    }),
   setTimeLeft: (timeLeft) => set({ timeLeft }),
   setTypingUser: (typingUser) => set({ typingUser }),
   setQueueStatus: (queueStatus) => set({ queueStatus })

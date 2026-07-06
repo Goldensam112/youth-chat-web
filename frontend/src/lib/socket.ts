@@ -10,8 +10,7 @@ export function getSocket() {
   if (!socket) {
     socket = io(API_URL, {
       autoConnect: false,
-      auth: { token },
-      transports: ["websocket"]
+      auth: { token }
     });
   }
 

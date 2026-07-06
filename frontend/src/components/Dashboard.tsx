@@ -28,6 +28,27 @@ export function Dashboard({ mobileTab, onOpenChat }: DashboardProps) {
     loadTransactions();
   }, [user?._id]);
 
+  useEffect(() => {
+    if (queueStatus !== "queued") return;
+
+    const interval = window.setInterval(async () => {
+      try {
+        const res = await api<{ status: "queued" | "matched"; room?: Room; timeLeft?: number }>("/api/match/find", { method: "POST" });
+        if (res.status === "matched" && res.room) {
+          setRoom(res.room);
+          setTimeLeft(res.timeLeft ?? 60);
+          setQueueStatus("matched");
+          setNotice("");
+          onOpenChat?.();
+        }
+      } catch (error) {
+        setNotice(error instanceof Error ? error.message : "Unable to continue search.");
+      }
+    }, 2500);
+
+    return () => window.clearInterval(interval);
+  }, [queueStatus, onOpenChat, setQueueStatus, setRoom, setTimeLeft]);
+
   async function findMatch() {
     setNotice("");
     setQueueStatus("queued");
