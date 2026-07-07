@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
-import { Clock3, Flag, MessageSquareDashed, Send, Shield, Sparkles, TimerReset, X, Zap } from "lucide-react";
+import { Clock3, Flag, MessageSquareDashed, Send, Shield, Sparkles, TimerReset, X, Zap, UserPlus } from "lucide-react";
 import { api } from "@/lib/api";
 import { getSocket } from "@/lib/socket";
 import type { Message, Room } from "@/lib/types";
@@ -10,6 +10,7 @@ import { BannerAd } from "./ads/BannerAd";
 import { NativeAd } from "./ads/NativeAd";
 import { Button } from "./Button";
 import { LockOverlay } from "./LockOverlay";
+import AdFollowPopup from "./ads/AdFollowPopup"; // Naya popup component import kiya
 
 export function ChatViewport({ mobile = false }: { mobile?: boolean }) {
   const { room, user, messages, timeLeft, typingUser, setRoom, setMessages, addMessage, setTimeLeft, setTypingUser } =
@@ -17,6 +18,11 @@ export function ChatViewport({ mobile = false }: { mobile?: boolean }) {
   const [body, setBody] = useState("");
   const [roomNotice, setRoomNotice] = useState("");
   const [sending, setSending] = useState(false);
+  
+  // --- NAYE STATES FOR POPUP & RECHARGE ---
+  const [isAdPopupOpen, setIsAdPopupOpen] = useState(false);
+  const [loadingFollow, setLoadingFollow] = useState(false);
+
   const listRef = useRef<HTMLDivElement | null>(null);
   const roomId = room?._id;
 
@@ -71,6 +77,7 @@ export function ChatViewport({ mobile = false }: { mobile?: boolean }) {
   }, [messages.length]);
 
   const displayTimer = useMemo(() => {
+    if (timeLeft > 9999) return "♾️ UNLOCKED"; // Follow karne ke baad timer par unlimited likha aayega
     const minutes = Math.floor(timeLeft / 60)
       .toString()
       .padStart(2, "0");
@@ -102,6 +109,56 @@ export function ChatViewport({ mobile = false }: { mobile?: boolean }) {
     setBody(value);
     if (!room) return;
     getSocket()?.emit("typing", { roomId: room._id, isTyping: value.length > 0 });
+  }
+
+  // --- BUTTON FUNCTION 1: ₹20 RECHARGE SE FOLLOW KARNA ---
+  async function followViaRecharge() {
+    if (!room) return;
+    setLoadingFollow(true);
+    try {
+      // Chat participants mein se samne wale ki ID nikalna
+      const targetUserId = room.participants.find(p => p !== user?._id);
+      
+      const res = await api<{ success: boolean; error?: string }>("/api/wallet/follow-user", {
+        method: "POST",
+        body: JSON.stringify({ followingId: targetUserId, method: "RECHARGE" })
+      });
+
+      if (res.success) {
+        setRoomNotice("Mubarak ho! ₹20 Recharge se follow ho gaya. Chat fir se chal gayi 🎉");
+        // Room status ko wapas active kar do frontend par
+        useChatStore.setState((state) => (state.room ? { room: { ...state.room, status: "active" } } : state));
+        setTimeLeft(999999);
+      } else {
+        setRoomNotice(res.error || "Recharge balance kam hai bhai!");
+      }
+    } catch (err) {
+      setRoomNotice("Recharge wala check fail ho gaya!");
+    } finally {
+      setLoadingFollow(false);
+    }
+  }
+
+  // --- BUTTON FUNCTION 2: 3 ADS KHATAM HONE PAR SUCCESS HANDELLER ---
+  async function handleAdsSuccess() {
+    setIsAdPopupOpen(false);
+    if (!room) return;
+    try {
+      const targetUserId = room.participants.find(p => p !== user?._id);
+      
+      const res = await api<{ success: boolean }>("/api/wallet/follow-user", {
+        method: "POST",
+        body: JSON.stringify({ followingId: targetUserId, method: "ADS" })
+      });
+
+      if (res.success) {
+        setRoomNotice("Mubarak ho! 3 Ads poore dekhe. Direct Chat Lifetime Unlock ho gayi 🎉");
+        useChatStore.setState((state) => (state.room ? { room: { ...state.room, status: "active" } } : state));
+        setTimeLeft(999999);
+      }
+    } catch (err) {
+      setRoomNotice("Something went wrong with ads activation!");
+    }
   }
 
   async function reportRoom() {
@@ -168,6 +225,31 @@ export function ChatViewport({ mobile = false }: { mobile?: boolean }) {
             {displayTimer}
           </div>
         </div>
+        
+        {/* --- NAYA BUTTON PANEL HEADER MEIN AGAR USER DIRECT CHAT UNLOCK KARNA CHAHE --- */}
+        {timeLeft < 9999 && (
+          <div className="mt-3 p-2 bg-purple-950/40 border border-purple-500/30 rounded-lg flex flex-wrap items-center justify-between gap-2">
+            <div className="text-xs text-purple-300 font-medium flex items-center gap-1">
+              <UserPlus className="h-3 w-3 text-purple-400" /> Is Person se hamesha ke liye chat unlock karein:
+            </div>
+            <div className="flex gap-2 w-full sm:w-auto justify-end">
+              <button 
+                onClick={followViaRecharge} 
+                disabled={loadingFollow}
+                className="bg-gold hover:bg-gold/80 text-ink text-xs font-bold px-2 py-1.5 rounded transition disabled:opacity-50"
+              >
+                {loadingFollow ? "Processing..." : "₹20 Recharge"}
+              </button>
+              <button 
+                onClick={() => setIsAdPopupOpen(true)}
+                className="bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold px-2 py-1.5 rounded transition"
+              >
+                📺 Watch 3 Ads (Free)
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
           <div className="min-w-0 flex-1 items-center gap-2 text-xs text-white/55 sm:flex">
             <Shield className="h-4 w-4 text-gold" />
@@ -182,8 +264,9 @@ export function ChatViewport({ mobile = false }: { mobile?: boolean }) {
             </button>
           </div>
         </div>
-        {roomNotice ? <p className="mt-2 rounded-lg border border-line bg-panel p-2 text-xs text-white/65">{roomNotice}</p> : null}
+        {roomNotice ? <p className="mt-2 rounded-lg border border-line bg-panel p-2 text-xs text-yellow-400 font-medium">{roomNotice}</p> : null}
       </header>
+      
       <div className="border-b border-line bg-panel p-2">
         <BannerAd />
       </div>
@@ -229,6 +312,13 @@ export function ChatViewport({ mobile = false }: { mobile?: boolean }) {
       </form>
 
       <LockOverlay />
+
+      {/* --- ADS POPUP RENDER COMPONENT --- */}
+      <AdFollowPopup 
+        isOpen={isAdPopupOpen} 
+        onClose={() => setIsAdPopupOpen(false)} 
+        onSuccess={handleAdsSuccess} 
+      />
     </section>
   );
 }
