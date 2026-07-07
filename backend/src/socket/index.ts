@@ -4,6 +4,7 @@ import { env } from "../config/env.js";
 import { Message } from "../models/Message.js";
 import { Room } from "../models/Room.js";
 import { User } from "../models/User.js";
+import { Follow } from "../models/Follow.js"; // Naya follow model yahan joda
 import { setSocketServer } from "./notifier.js";
 import { getRoomTimeLeft, isRoomExpired } from "../utils/timer.js";
 
@@ -18,13 +19,31 @@ declare module "socket.io" {
   }
 }
 
+// --- ROOM EXPIRY CHECKER WITH FOLLOW BYPASS ---
 async function lockExpiredRoom(io: Server, roomId: string) {
   const room = await Room.findById(roomId);
-  if (!room || room.status !== "active" || !isRoomExpired(room)) return room;
+  if (!room || room.status !== "active") return room;
 
-  room.status = "locked";
-  await room.save();
-  io.to(roomId).emit("room_lock", { roomId, lockedAt: new Date().toISOString(), reason: "free_window_expired" });
+  // Agar dono participants mein se kisi ne bhi ek dusre ko follow kiya hai, to chat LOCK NAHI HOGI!
+  const [userA, userB] = room.participants;
+  const hasFollowRelationship = await Follow.findOne({
+    $or: [
+      { followerId: userA, followingId: userB },
+      { followerId: userB, followingId: userA }
+    ]
+  });
+
+  // Agar follow kiya hua hai, to room lock karne ki koi zaroorat nahi hai (Bypass)
+  if (hasFollowRelationship) {
+    return room;
+  }
+
+  // Agar follow nahi kiya hai aur time khatam ho gaya, tabhi lock hoga
+  if (isRoomExpired(room)) {
+    room.status = "locked";
+    await room.save();
+    io.to(roomId).emit("room_lock", { roomId, lockedAt: new Date().toISOString(), reason: "free_window_expired" });
+  }
   return room;
 }
 
@@ -51,6 +70,46 @@ export function registerSocketHandlers(io: Server) {
     await User.findByIdAndUpdate(userId, { isOnline: true, lastSeenAt: new Date() });
     socket.broadcast.emit("presence_update", { userId, isOnline: true });
 
+    // --- NAYA OPTION: DIRECT CHAT ROOM (BINA MATCH QUEUE KE) ---
+    socket.on("start_direct_chat", async ({ targetUserId }, callback) => {
+      try {
+        // Pehle check karo ki kya dono mein se kisi ne ek dusre ko follow kiya hai
+        const isFollowed = await Follow.findOne({
+          $or: [
+            { followerId: userId, followingId: targetUserId },
+            { followerId: targetUserId, followingId: userId }
+          ]
+        });
+
+        if (!isFollowed) {
+          return callback?.({ ok: false, message: "Bhai pehle follow (₹20 ya 3 ads) karna padega!" });
+        }
+
+        // Direct room dhoondo ya naya banao
+        let room = await Room.findOne({
+          participants: { $all: [userId, targetUserId] }
+        });
+
+        if (!room) {
+          room = await Room.create({
+            participants: [userId, targetUserId],
+            status: "active",
+            createdAt: new Date()
+          });
+        } else if (room.status === "locked") {
+          // Agar room pehle se locked tha, to follow karne ki wajah se use wapas open active kar do!
+          room.status = "active";
+          await room.save();
+        }
+
+        socket.join(room._id.toString());
+        callback?.({ ok: true, roomId: room._id.toString() });
+
+      } catch (error) {
+        callback?.({ ok: false, message: "Server mein kuch dikkat aayi!" });
+      }
+    });
+
     socket.on("join_room", async ({ roomId }, callback) => {
       const room = await Room.findById(roomId);
       if (!room) return callback?.({ ok: false, message: "Room not found" });
@@ -61,9 +120,16 @@ export function registerSocketHandlers(io: Server) {
       await lockExpiredRoom(io, roomId);
       const freshRoom = await Room.findById(roomId);
       socket.join(roomId);
+      
+      // Check follow for frontend timer hide
+      const [userA, userB] = room.participants;
+      const hasFollow = await Follow.findOne({
+        $or: [{ followerId: userA, followingId: userB }, { followerId: userB, followingId: userA }]
+      });
+
       callback?.({
         ok: true,
-        timeLeft: freshRoom ? getRoomTimeLeft(freshRoom) : 0,
+        timeLeft: hasFollow ? 999999 : (freshRoom ? getRoomTimeLeft(freshRoom) : 0), // Follow hone par unlimted time dikhayega
         status: freshRoom?.status,
         serverTime: new Date().toISOString()
       });
@@ -94,14 +160,26 @@ export function registerSocketHandlers(io: Server) {
     });
   });
 
+  // Timer loop for active rooms
   setInterval(async () => {
     const rooms = await Room.find({ status: "active" }).limit(500);
     await Promise.all(
       rooms.map(async (room) => {
         const roomId = room._id.toString();
-        const timeLeft = getRoomTimeLeft(room);
-        io.to(roomId).emit("timer_update", { roomId, timeLeft, serverTime: new Date().toISOString() });
-        if (timeLeft <= 0) await lockExpiredRoom(io, roomId);
+        
+        // Timer update bhejte waqt bhi follow check karenge
+        const [userA, userB] = room.participants;
+        const hasFollow = await Follow.findOne({
+          $or: [{ followerId: userA, followingId: userB }, { followerId: userB, followingId: userA }]
+        });
+
+        if (hasFollow) {
+          io.to(roomId).emit("timer_update", { roomId, timeLeft: 999999, serverTime: new Date().toISOString() });
+        } else {
+          const timeLeft = getRoomTimeLeft(room);
+          io.to(roomId).emit("timer_update", { roomId, timeLeft, serverTime: new Date().toISOString() });
+          if (timeLeft <= 0) await lockExpiredRoom(io, roomId);
+        }
       })
     );
   }, 1000);
