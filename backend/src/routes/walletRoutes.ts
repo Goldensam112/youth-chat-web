@@ -5,6 +5,7 @@ import { requireAuth } from "../utils/auth.js";
 import { env } from "../config/env.js";
 import { creditUser } from "../services/walletService.js";
 import { WalletTransaction } from "../models/WalletTransaction.js";
+import { Follow } from "../models/Follow.js"; // Humne naye follow model ko yahan joda
 
 const router = Router();
 
@@ -85,6 +86,73 @@ router.post("/purchase", requireAuth, async (req, res, next) => {
     const amount = packageId === "starter_50" ? 50 : packageId === "plus_150" ? 150 : 500;
     const result = await creditUser(req.user!._id.toString(), amount, "purchase", { packageId, provider: "mock-payment" });
     res.json({ user: result.user, transaction: result.transaction });
+  } catch (error) {
+    next(error);
+  }
+});
+
+
+// ========================================================
+// 🔥 NAYA FEATURE: DUAL FOLLOW SYSTEM (₹20 YA 3 ADS CHUNNE KA RASTA)
+// ========================================================
+router.post("/follow-user", requireAuth, async (req, res, next) => {
+  try {
+    const { followingId, method } = req.body; // method mein user 'RECHARGE' bheje ya 'ADS'
+    const followerId = req.user!._id;
+
+    // --- RASTA 1: USER NE ₹20 KA OPTION CHUNA ---
+    if (method === "RECHARGE") {
+      const RECHARGE_COST = 20; // ₹20 lagenge
+
+      // Balance check karne ke liye haseen raseed dhoondhenge
+      const latestTx = await WalletTransaction.findOne({ user: followerId }).sort({ createdAt: -1 });
+      const currentBalance = latestTx ? latestTx.balanceAfter : 0;
+
+      if (currentBalance < RECHARGE_COST) {
+        return res.status(400).json({ 
+          success: false, 
+          message: "No_Balance", 
+          error: "Bhai ₹20 ka recharge karo ya 3 Ads dekho!" 
+        });
+      }
+
+      // Raseed (debit transaction) bana rahe hain
+      await WalletTransaction.create({
+        user: followerId,
+        type: "purchase",
+        direction: "debit",
+        amount: RECHARGE_COST,
+        balanceAfter: currentBalance - RECHARGE_COST,
+        metadata: { info: `Followed user ${followingId} via ₹20 recharge` }
+      });
+
+      // Database mein rishta save kar rahe hain
+      await Follow.create({ followerId, followingId });
+      return res.json({ success: true, message: "Successfully followed via Recharge!" });
+    }
+
+    // --- RASTA 2: USER NE 3 ADS DEKH LIYE AUR WOH OPTION CHUNA ---
+    if (method === "ADS") {
+      const latestTx = await WalletTransaction.findOne({ user: followerId }).sort({ createdAt: -1 });
+      const currentBalance = latestTx ? latestTx.balanceAfter : 0;
+
+      // Raseed bana rahe hain (Isme paise nahi katenge balki record banega)
+      await WalletTransaction.create({
+        user: followerId,
+        type: "ad_reward",
+        direction: "credit",
+        amount: 1, // Rule ke mutabik kam se kam 1 likhna zaroori hai
+        balanceAfter: currentBalance,
+        metadata: { info: `Followed user ${followingId} after watching 3 Ads` }
+      });
+
+      // Database mein rishta save kar rahe hain
+      await Follow.create({ followerId, followingId });
+      return res.json({ success: true, message: "Successfully followed via Ads!" });
+    }
+
+    return res.status(400).json({ success: false, message: "Galat option chuna hai!" });
+
   } catch (error) {
     next(error);
   }
