@@ -35,7 +35,7 @@ router.patch("/", requireAuth, async (req, res, next) => {
 // ➕ NAYA ROUTE: Kisi user ko follow/unfollow (Connection mein add) karne ke liye action
 router.post("/user/:id/follow", requireAuth, async (req, res, next) => {
   try {
-    const followerId = req.user._id; // Aapki ID
+    const followerId = req.user!._id; // ✅ Fixed: Added ! for TypeScript
     const followingId = req.params.id; // Jise follow/connection mein add karna hai
 
     if (followerId.toString() === followingId.toString()) {
@@ -62,7 +62,7 @@ router.post("/user/:id/follow", requireAuth, async (req, res, next) => {
 // 🛠️ NAYA ROUTE: Purane Connections (Followed Users) ki list nikalna
 router.get("/my-connections", requireAuth, async (req, res, next) => {
   try {
-    const myId = req.user._id; // Logged-in user ki ID
+    const myId = req.user!._id; // ✅ Fixed: Added ! for TypeScript
 
     // Un logo ko dhoondho jinhe is user ne follow kiya hai
     const connections = await Follow.find({ followerId: myId })
