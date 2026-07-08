@@ -33,12 +33,13 @@ router.patch("/", requireAuth, async (req, res, next) => {
 });
 
 // ➕ NAYA ROUTE: Kisi user ko follow/unfollow (Connection mein add) karne ke liye action
+// ⚡ FIX: explicit string mapping lagayi hai taaki Mongoose validation crash na ho
 router.post("/user/:id/follow", requireAuth, async (req, res, next) => {
   try {
-    const followerId = req.user!._id; // ✅ Fixed: Added ! for TypeScript
-    const followingId = req.params.id; // Jise follow/connection mein add karna hai
+    const followerId = String(req.user!._id); 
+    const followingId = String(req.params.id); 
 
-    if (followerId.toString() === followingId.toString()) {
+    if (followerId === followingId) {
       return res.status(400).json({ success: false, message: "Aap khud ko connection mein add nahi kar sakte!" });
     }
 
@@ -55,14 +56,16 @@ router.post("/user/:id/follow", requireAuth, async (req, res, next) => {
       return res.json({ success: true, isFollowing: true, message: "Connection mein joda gaya" });
     }
   } catch (error) {
-    next(error);
+    console.error("Follow Action Backend Error:", error);
+    res.status(500).json({ success: false, message: "Backend crash logs triggered inside follow." });
   }
 });
 
 // 🛠️ NAYA ROUTE: Purane Connections (Followed Users) ki list nikalna
+// ⚡ FIX: Response mapping ko clean kiya taaki front-end dashboard easily read kar sake
 router.get("/my-connections", requireAuth, async (req, res, next) => {
   try {
-    const myId = req.user!._id; // ✅ Fixed: Added ! for TypeScript
+    const myId = String(req.user!._id); 
 
     // Un logo ko dhoondho jinhe is user ne follow kiya hai
     const connections = await Follow.find({ followerId: myId })
@@ -76,7 +79,8 @@ router.get("/my-connections", requireAuth, async (req, res, next) => {
 
     res.json({ success: true, data: formattedConnections });
   } catch (error) {
-    next(error);
+    console.error("Get Connections Backend Error:", error);
+    res.status(500).json({ success: false, message: "Backend crash logs triggered inside get connections." });
   }
 });
 
