@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import Script from "next/script"; // ✅ Next.js ka Script component import kiya
+import Script from "next/script";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -19,12 +19,12 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="en">
       <head>
-        {/* ✅ Google AdSense ki Auto-Ads Script clean tarike se head mein add ho gayi */}
+        {/* ✅ Fixed: 'crossorigin' ko badal kar 'crossOrigin' (Capital O) kar diya hai */}
         <Script
           async
           src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-2192077753906094"
-          crossorigin="anonymous"
-          strategy="afterInteractive" // Yeh page load hone ke baad silently ads load karega taaki chat lag na ho
+          crossOrigin="anonymous" 
+          strategy="afterInteractive"
         />
       </head>
       <body>{children}</body>
