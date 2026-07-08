@@ -10,16 +10,15 @@ import { BannerAd } from "./ads/BannerAd";
 import { NativeAd } from "./ads/NativeAd";
 import { Button } from "./Button";
 import { LockOverlay } from "./LockOverlay";
-import AdFollowPopup from "./ads/AdFollowPopup"; // Naya popup component import kiya
+import AdFollowPopup from "./ads/AdFollowPopup";
 
 export function ChatViewport({ mobile = false }: { mobile?: boolean }) {
-  const { room, user, messages, timeLeft, typingUser, setRoom, setMessages, addMessage, setTimeLeft, setTypingUser } =
+  const { room, user, messages, timeLeft, typingUser, setRoom, setMessages, addMessage, setTimeLeft, setTypingUser, setUser } =
     useChatStore();
   const [body, setBody] = useState("");
   const [roomNotice, setRoomNotice] = useState("");
   const [sending, setSending] = useState(false);
   
-  // --- NAYE STATES FOR POPUP & RECHARGE ---
   const [isAdPopupOpen, setIsAdPopupOpen] = useState(false);
   const [loadingFollow, setLoadingFollow] = useState(false);
 
@@ -59,28 +58,35 @@ export function ChatViewport({ mobile = false }: { mobile?: boolean }) {
       setTypingUser(isTyping ? userId : null);
     };
 
+    // ⚡ Realtime Billing Listeners (Credits updates handle karne ke liye)
+    const handleBalanceUpdated = (data: { credits: number }) => {
+      if (user) {
+        setUser({ ...user, credits: data.credits });
+      }
+    };
+
     socket.on("message:new", handleMessage);
     socket.on("timer_update", handleTimer);
     socket.on("room_lock", handleLock);
     socket.on("typing", handleTyping);
+    socket.on("balance_updated", handleBalanceUpdated);
 
     return () => {
       socket.off("message:new", handleMessage);
       socket.off("timer_update", handleTimer);
       socket.off("room_lock", handleLock);
       socket.off("typing", handleTyping);
+      socket.off("balance_updated", handleBalanceUpdated);
     };
-  }, [roomId, addMessage, setTimeLeft, setTypingUser]);
+  }, [roomId, addMessage, setTimeLeft, setTypingUser, user, setUser]);
 
   useEffect(() => {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" });
   }, [messages.length]);
 
   const displayTimer = useMemo(() => {
-    if (timeLeft > 9999) return "♾️ UNLOCKED"; // Follow karne ke baad timer par unlimited likha aayega
-    const minutes = Math.floor(timeLeft / 60)
-      .toString()
-      .padStart(2, "0");
+    if (timeLeft > 9999) return "♾️ UNLOCKED"; 
+    const minutes = Math.floor(timeLeft / 60).toString().padStart(2, "0");
     const seconds = (timeLeft % 60).toString().padStart(2, "0");
     return `${minutes}:${seconds}`;
   }, [timeLeft]);
@@ -111,53 +117,49 @@ export function ChatViewport({ mobile = false }: { mobile?: boolean }) {
     getSocket()?.emit("typing", { roomId: room._id, isTyping: value.length > 0 });
   }
 
-  // --- BUTTON FUNCTION 1: ₹20 RECHARGE SE FOLLOW KARNA ---
+  // 🛠️ FIX 1: ₹20 Recharge se dynamic backend follow path fetch karna
   async function followViaRecharge() {
     if (!room) return;
     setLoadingFollow(true);
     try {
-      // Chat participants mein se samne wale ki ID nikalna
       const targetUserId = room.participants.find(p => p !== user?._id);
       
-      const res = await api<{ success: boolean; error?: string }>("/api/wallet/follow-user", {
-        method: "POST",
-        body: JSON.stringify({ followingId: targetUserId, method: "RECHARGE" })
+      const res = await api<{ success: boolean; message?: string }>(`/profile/user/${targetUserId}/follow`, {
+        method: "POST"
       });
 
       if (res.success) {
-        setRoomNotice("Mubarak ho! ₹20 Recharge se follow ho gaya. Chat fir se chal gayi 🎉");
-        // Room status ko wapas active kar do frontend par
+        setRoomNotice("Mubarak ho! Connection successfully joda gaya 🎉");
         useChatStore.setState((state) => (state.room ? { room: { ...state.room, status: "active" } } : state));
         setTimeLeft(999999);
       } else {
-        setRoomNotice(res.error || "Recharge balance kam hai bhai!");
+        setRoomNotice(res.message || "Recharge balance kam hai bhai!");
       }
     } catch (err) {
-      setRoomNotice("Recharge wala check fail ho gaya!");
+      setRoomNotice("Action execution failure!");
     } finally {
       setLoadingFollow(false);
     }
   }
 
-  // --- BUTTON FUNCTION 2: 3 ADS KHATAM HONE PAR SUCCESS HANDELLER ---
+  // 🛠️ FIX 2: 3 Ads khatam hote hi database connection create karna
   async function handleAdsSuccess() {
     setIsAdPopupOpen(false);
     if (!room) return;
     try {
       const targetUserId = room.participants.find(p => p !== user?._id);
       
-      const res = await api<{ success: boolean }>("/api/wallet/follow-user", {
-        method: "POST",
-        body: JSON.stringify({ followingId: targetUserId, method: "ADS" })
+      const res = await api<{ success: boolean }>(`/profile/user/${targetUserId}/follow`, {
+        method: "POST"
       });
 
       if (res.success) {
-        setRoomNotice("Mubarak ho! 3 Ads poore dekhe. Direct Chat Lifetime Unlock ho gayi 🎉");
+        setRoomNotice("Mubarak ho! 3 Ads complete hue. User connections mein save ho gaya hai!");
         useChatStore.setState((state) => (state.room ? { room: { ...state.room, status: "active" } } : state));
         setTimeLeft(999999);
       }
     } catch (err) {
-      setRoomNotice("Something went wrong with ads activation!");
+      setRoomNotice("Something went wrong with connection activation!");
     }
   }
 
@@ -226,7 +228,6 @@ export function ChatViewport({ mobile = false }: { mobile?: boolean }) {
           </div>
         </div>
         
-        {/* --- NAYA BUTTON PANEL HEADER MEIN AGAR USER DIRECT CHAT UNLOCK KARNA CHAHE --- */}
         {timeLeft < 9999 && (
           <div className="mt-3 p-2 bg-purple-950/40 border border-purple-500/30 rounded-lg flex flex-wrap items-center justify-between gap-2">
             <div className="text-xs text-purple-300 font-medium flex items-center gap-1">
@@ -244,6 +245,7 @@ export function ChatViewport({ mobile = false }: { mobile?: boolean }) {
                 onClick={() => setIsAdPopupOpen(true)}
                 className="bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold px-2 py-1.5 rounded transition"
               >
+                {/* Render clean text update */}
                 📺 Watch 3 Ads (Free)
               </button>
             </div>
@@ -253,7 +255,7 @@ export function ChatViewport({ mobile = false }: { mobile?: boolean }) {
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
           <div className="min-w-0 flex-1 items-center gap-2 text-xs text-white/55 sm:flex">
             <Shield className="h-4 w-4 text-gold" />
-            <span className="line-clamp-2">{room.status === "active" ? "Messages are live until the free clock ends." : "Room is locked until credits are used."}</span>
+            <span className="line-clamp-2">{room.status === "active" ? "Messages are live." : "Room is locked until credits are used."}</span>
           </div>
           <div className="flex gap-2">
             <button className="grid h-8 w-8 place-items-center rounded-lg border border-line bg-panel text-white/65 hover:text-white" onClick={reportRoom} title="Report">
@@ -313,7 +315,6 @@ export function ChatViewport({ mobile = false }: { mobile?: boolean }) {
 
       <LockOverlay />
 
-      {/* --- ADS POPUP RENDER COMPONENT --- */}
       <AdFollowPopup 
         isOpen={isAdPopupOpen} 
         onClose={() => setIsAdPopupOpen(false)} 
