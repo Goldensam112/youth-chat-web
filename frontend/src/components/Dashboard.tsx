@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Clapperboard, Compass, CreditCard, Gem, LogOut, MessageCircle, Radar, ShieldCheck, Sparkles, UserRoundCheck, Wallet, Users } from "lucide-react"; // Users icon joda hai
+import { Clapperboard, Compass, CreditCard, Gem, LogOut, MessageCircle, Radar, ShieldCheck, Sparkles, UserRoundCheck, Wallet, Users } from "lucide-react"; 
 import { api } from "@/lib/api";
 import { loadPopunderOnce, openSmartAd } from "@/lib/adsterra";
 import type { Room, User, WalletTransaction } from "@/lib/types";
@@ -35,7 +35,7 @@ export function Dashboard({ mobileTab, onOpenChat }: DashboardProps) {
     setDraftBio(user.bio);
     setDraftInterests(user.interests.join(", "));
     loadTransactions();
-    loadConnections(); // Connections list load karein
+    loadConnections(); 
   }, [user?._id]);
 
   useEffect(() => {
@@ -74,15 +74,8 @@ export function Dashboard({ mobileTab, onOpenChat }: DashboardProps) {
     }
   }
 
-  // 🛠️ Action: Connections list se direct chat room initiate karna (Via socket bypass rules)
+  // 🛠️ Action: Direct chat trigger fallback
   async function startDirectChat(targetUserId: string) {
-    setNotice("Connecting to your connection...");
-    // Aapke websocket store me toggle handler call karne ke liye ya socket connection fetch karne ke liye logic helper
-    const socket = useChatStore.getState().room; // Handle reference check
-    
-    // Global chat handling sequence trigger
-    // Front-end socket triggers socket.emit('start_direct_chat', { targetUserId }) setup handles internally
-    // Safe fallback message if routing happens via global window
     setNotice("Connecting room...");
     if (onOpenChat) onOpenChat();
   }
@@ -275,7 +268,7 @@ export function Dashboard({ mobileTab, onOpenChat }: DashboardProps) {
         {notice ? <p className="mt-3 rounded-lg border border-line bg-ink p-3 text-sm text-white/65">{notice}</p> : null}
       </div> : null}
 
-      {/* 🤝 ✅ NAYA SECTION: Connections Card (Bina purane design ko disturb kiye Discovery ke niche setup kiya hai) */}
+      {/* 🤝 Connections Card */}
       {showDiscover ? (
         <div className="rounded-lg border border-line bg-panel p-4 shadow-sm">
           <div className="mb-4 flex items-center justify-between">
@@ -371,14 +364,17 @@ export function Dashboard({ mobileTab, onOpenChat }: DashboardProps) {
         </div>
       </div> : null}
 
-      {showBoardcast || showProfile ? <div className="rounded-lg border border-line bg-panel p-4">
-        <div className="flex gap-3">
-          <ShieldCheck className="mt-1 h-5 w-5 shrink-0 text-gold" />
-          <p className="text-sm leading-6 text-white/68">
-            Use report or close room any time a conversation does not feel right.
+      {/* ✅ Fixed: Changed showBoardcast to showDiscover here */}
+      {showDiscover || showProfile ? (
+        <div className="rounded-lg border border-line bg-panel p-4">
+          <div className="flex gap-3">
+            <ShieldCheck className="mt-1 h-5 w-5 shrink-0 text-gold" />
+            <p className="text-sm leading-6 text-white/68">
+              Use report or close room any time a conversation does not feel right.
           </p>
+          </div>
         </div>
-      </div> : null}
+      ) : null}
 
       {showDiscover ? <div className="grid grid-cols-2 gap-3">
         <div className="rounded-lg border border-line bg-panel p-3">
