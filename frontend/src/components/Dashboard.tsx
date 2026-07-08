@@ -4,9 +4,9 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Clapperboard, Compass, CreditCard, Gem, LogOut, MessageCircle, Radar, ShieldCheck, Sparkles, UserRoundCheck, Wallet, Users } from "lucide-react"; 
 import { api } from "@/lib/api";
-import { getSocket } from "@/lib/socket"; // ⚡ Direct chat socket trigger ke liye import joda
+import { getSocket } from "@/lib/socket"; 
 import { loadPopunderOnce, openSmartAd } from "@/lib/adsterra";
-import type { Room, User, WalletTransaction } from "@/lib/types";
+import type { Room, User, WalletTransaction, Message } from "@/lib/types"; // ✅ Explicit Type Mapping fixed here
 import { useChatStore } from "@/store/useChatStore";
 import { BannerAd } from "./ads/BannerAd";
 import { NativeAd } from "./ads/NativeAd";
@@ -60,7 +60,7 @@ export function Dashboard({ mobileTab, onOpenChat }: DashboardProps) {
     return () => window.clearInterval(interval);
   }, [queueStatus, onOpenChat, setQueueStatus, setRoom, setTimeLeft]);
 
-  // 🛠️ FIX 1: API Path ko /api/profile ke mutabik sahi map kiya
+  // 🛠️ Connections list fetch karne ke liye
   async function loadConnections() {
     setLoadingConnections(true);
     try {
@@ -75,7 +75,7 @@ export function Dashboard({ mobileTab, onOpenChat }: DashboardProps) {
     }
   }
 
-  // 🛠️ FIX 2: Direct Chat active socket sequence execution handlers
+  // 🛠️ Direct Chat active socket sequence execution handlers
   async function startDirectChat(targetUserId: string) {
     setNotice("Connecting room...");
     const socket = getSocket();
@@ -84,11 +84,9 @@ export function Dashboard({ mobileTab, onOpenChat }: DashboardProps) {
       return;
     }
 
-    // Backend socket server par 'start_direct_chat' emit karenge
     socket.emit("start_direct_chat", { targetUserId }, async (res: { ok: boolean; roomId?: string; message?: string }) => {
       if (res.ok && res.roomId) {
         try {
-          // Room ke andar fresh messages fetch karke chat active karenge
           const freshRoomDetails = await api<{ room: Room; messages: Message[]; timeLeft: number }>(`/api/rooms/${res.roomId}`);
           setRoom(freshRoomDetails.room);
           setMessages(freshRoomDetails.messages);
