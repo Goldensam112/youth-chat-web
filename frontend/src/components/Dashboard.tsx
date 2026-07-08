@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Clapperboard, Compass, CreditCard, Gem, LogOut, MessageCircle, Radar, ShieldCheck, Sparkles, UserRoundCheck, Wallet, Users } from "lucide-react"; 
 import { api } from "@/lib/api";
+import { getSocket } from "@/lib/socket"; // ⚡ Direct chat socket trigger ke liye import joda
 import { loadPopunderOnce, openSmartAd } from "@/lib/adsterra";
 import type { Room, User, WalletTransaction } from "@/lib/types";
 import { useChatStore } from "@/store/useChatStore";
@@ -59,11 +60,11 @@ export function Dashboard({ mobileTab, onOpenChat }: DashboardProps) {
     return () => window.clearInterval(interval);
   }, [queueStatus, onOpenChat, setQueueStatus, setRoom, setTimeLeft]);
 
-  // 🛠️ API Call: Connections list fetch karne ke liye
+  // 🛠️ FIX 1: API Path ko /api/profile ke mutabik sahi map kiya
   async function loadConnections() {
     setLoadingConnections(true);
     try {
-      const res = await api<{ success: boolean; data: any[] }>("/profile/my-connections");
+      const res = await api<{ success: boolean; data: any[] }>("/api/profile/my-connections");
       if (res.success) {
         setConnections(res.data);
       }
@@ -74,10 +75,34 @@ export function Dashboard({ mobileTab, onOpenChat }: DashboardProps) {
     }
   }
 
-  // 🛠️ Action: Direct chat trigger fallback
+  // 🛠️ FIX 2: Direct Chat active socket sequence execution handlers
   async function startDirectChat(targetUserId: string) {
     setNotice("Connecting room...");
-    if (onOpenChat) onOpenChat();
+    const socket = getSocket();
+    if (!socket) {
+      setNotice("Socket connection is not ready. Please try again.");
+      return;
+    }
+
+    // Backend socket server par 'start_direct_chat' emit karenge
+    socket.emit("start_direct_chat", { targetUserId }, async (res: { ok: boolean; roomId?: string; message?: string }) => {
+      if (res.ok && res.roomId) {
+        try {
+          // Room ke andar fresh messages fetch karke chat active karenge
+          const freshRoomDetails = await api<{ room: Room; messages: Message[]; timeLeft: number }>(`/api/rooms/${res.roomId}`);
+          setRoom(freshRoomDetails.room);
+          setMessages(freshRoomDetails.messages);
+          setTimeLeft(freshRoomDetails.timeLeft);
+          setQueueStatus("matched");
+          setNotice("");
+          if (onOpenChat) onOpenChat();
+        } catch (err) {
+          setNotice("Room load karne mein dikkat aayi.");
+        }
+      } else {
+        setNotice(res.message || "Direct chat shuru nahi ho paayi.");
+      }
+    });
   }
 
   async function findMatch() {
@@ -364,14 +389,13 @@ export function Dashboard({ mobileTab, onOpenChat }: DashboardProps) {
         </div>
       </div> : null}
 
-      {/* ✅ Fixed: Changed showBoardcast to showDiscover here */}
       {showDiscover || showProfile ? (
         <div className="rounded-lg border border-line bg-panel p-4">
           <div className="flex gap-3">
             <ShieldCheck className="mt-1 h-5 w-5 shrink-0 text-gold" />
             <p className="text-sm leading-6 text-white/68">
               Use report or close room any time a conversation does not feel right.
-          </p>
+            </p>
           </div>
         </div>
       ) : null}
