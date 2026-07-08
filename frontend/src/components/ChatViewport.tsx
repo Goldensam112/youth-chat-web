@@ -48,6 +48,7 @@ export function ChatViewport({ mobile = false }: { mobile?: boolean }) {
 
     const handleMessage = ({ message }: { message: Message }) => addMessage(message);
     const handleTimer = ({ roomId: eventRoomId, timeLeft: nextTimeLeft }: { roomId: string; timeLeft: number }) => {
+      // ⚡ YAHAN CHANGED: Agar backend user se dynamic billing kar raha hai, toh usi time ko stream hone do
       if (eventRoomId === roomId) setTimeLeft(nextTimeLeft);
     };
     const handleLock = ({ roomId: eventRoomId }: { roomId: string }) => {
@@ -58,7 +59,7 @@ export function ChatViewport({ mobile = false }: { mobile?: boolean }) {
       setTypingUser(isTyping ? userId : null);
     };
 
-    // ⚡ Realtime Billing Listeners (Credits updates handle karne ke liye)
+    // ⚡ Realtime Billing Listener (Credits updates handle karne ke liye)
     const handleBalanceUpdated = (data: { credits: number }) => {
       if (user) {
         setUser({ ...user, credits: data.credits });
@@ -85,6 +86,7 @@ export function ChatViewport({ mobile = false }: { mobile?: boolean }) {
   }, [messages.length]);
 
   const displayTimer = useMemo(() => {
+    // ⚡ YAHAN CHANGED: Unlimited window sirf display ke liye 999999 target karegi par backend calculation logic transparent rahega
     if (timeLeft > 9999) return "♾️ UNLOCKED"; 
     const minutes = Math.floor(timeLeft / 60).toString().padStart(2, "0");
     const seconds = (timeLeft % 60).toString().padStart(2, "0");
@@ -117,21 +119,21 @@ export function ChatViewport({ mobile = false }: { mobile?: boolean }) {
     getSocket()?.emit("typing", { roomId: room._id, isTyping: value.length > 0 });
   }
 
-  // 🛠️ FIX 1: ₹20 Recharge se dynamic backend follow path fetch karna
+  // 🛠️ FIX: Sahi endpoints routing structure lagaya taaki "Something went wrong" hat jaye
   async function followViaRecharge() {
     if (!room) return;
     setLoadingFollow(true);
     try {
       const targetUserId = room.participants.find(p => p !== user?._id);
       
-      const res = await api<{ success: boolean; message?: string }>(`/profile/user/${targetUserId}/follow`, {
+      const res = await api<{ success: boolean; message?: string }>(`/api/profile/user/${targetUserId}/follow`, {
         method: "POST"
       });
 
       if (res.success) {
         setRoomNotice("Mubarak ho! Connection successfully joda gaya 🎉");
         useChatStore.setState((state) => (state.room ? { room: { ...state.room, status: "active" } } : state));
-        setTimeLeft(999999);
+        setTimeLeft(60); // ⚡ YAHAN CHANGED: Timer reset kiya taaki billing algorithm seamlessly listen kare
       } else {
         setRoomNotice(res.message || "Recharge balance kam hai bhai!");
       }
@@ -142,21 +144,21 @@ export function ChatViewport({ mobile = false }: { mobile?: boolean }) {
     }
   }
 
-  // 🛠️ FIX 2: 3 Ads khatam hote hi database connection create karna
+  // 🛠️ FIX: Ads success event par actual backend follow data create karna
   async function handleAdsSuccess() {
     setIsAdPopupOpen(false);
     if (!room) return;
     try {
       const targetUserId = room.participants.find(p => p !== user?._id);
       
-      const res = await api<{ success: boolean }>(`/profile/user/${targetUserId}/follow`, {
+      const res = await api<{ success: boolean }>(`/api/profile/user/${targetUserId}/follow`, {
         method: "POST"
       });
 
       if (res.success) {
         setRoomNotice("Mubarak ho! 3 Ads complete hue. User connections mein save ho gaya hai!");
         useChatStore.setState((state) => (state.room ? { room: { ...state.room, status: "active" } } : state));
-        setTimeLeft(999999);
+        setTimeLeft(60); // ⚡ YAHAN CHANGED: Timer ko current billing loop se jod diya
       }
     } catch (err) {
       setRoomNotice("Something went wrong with connection activation!");
@@ -245,7 +247,6 @@ export function ChatViewport({ mobile = false }: { mobile?: boolean }) {
                 onClick={() => setIsAdPopupOpen(true)}
                 className="bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold px-2 py-1.5 rounded transition"
               >
-                {/* Render clean text update */}
                 📺 Watch 3 Ads (Free)
               </button>
             </div>
