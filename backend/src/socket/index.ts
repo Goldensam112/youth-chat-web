@@ -4,9 +4,12 @@ import { env } from "../config/env.js";
 import { Message } from "../models/Message.js";
 import { Room } from "../models/Room.js";
 import { User } from "../models/User.js";
-import { Follow } from "../models/Follow.js"; // Naya follow model yahan joda
+import { Follow } from "../models/Follow.js"; 
 import { setSocketServer } from "./notifier.js";
 import { getRoomTimeLeft, isRoomExpired } from "../utils/timer.js";
+
+// 🔄 Har user ke billing interval timers track karne ke liye registry
+const userBillingTimers = new Map();
 
 type SocketUser = {
   id: string;
@@ -19,12 +22,64 @@ declare module "socket.io" {
   }
 }
 
+// 🔥 NAYA UTILITY FUNCTION: Har 1 minute par credit deduct karne wala loop
+function startUserBilling(io: Server, socket: any, userId: string, roomId: string) {
+  // Purana koi timer chal raha ho is user ka to pehle clean karein
+  if (userBillingTimers.has(userId)) {
+    clearInterval(userBillingTimers.get(userId));
+  }
+
+  const intervalId = setInterval(async () => {
+    try {
+      const user = await User.findById(userId);
+
+      // 1. Check karo credits bache hain ya nahi (Minimum 1 chahiye)
+      if (!user || user.credits < 1) {
+        // Room status lock update karo database me
+        await Room.findByIdAndUpdate(roomId, { status: "locked" });
+
+        // Room ke sabhi users ko block page event trigger bhejo
+        io.to(roomId).emit("room_lock", { 
+          roomId, 
+          lockedAt: new Date().toISOString(), 
+          reason: "insufficient_credits" 
+        });
+
+        clearInterval(intervalId);
+        userBillingTimers.delete(userId);
+        return;
+      }
+
+      // 2. Credits deduct karo
+      user.credits -= 1;
+      await user.save();
+
+      // 3. Frontend ko realtime automatic balance push karo (CreditPill handle ke liye)
+      socket.emit("balance_updated", { credits: user.credits });
+
+    } catch (err) {
+      console.error("Billing logic loop integration failure:", err);
+      clearInterval(intervalId);
+      userBillingTimers.delete(userId);
+    }
+  }, 60000); // Perfect 60000ms = 1 Minute
+
+  userBillingTimers.set(userId, intervalId);
+}
+
+// 🛑 Billing timer clear karne ka wrapper function
+function stopUserBilling(userId: string) {
+  if (userBillingTimers.has(userId)) {
+    clearInterval(userBillingTimers.get(userId));
+    userBillingTimers.delete(userId);
+  }
+}
+
 // --- ROOM EXPIRY CHECKER WITH FOLLOW BYPASS ---
 async function lockExpiredRoom(io: Server, roomId: string) {
   const room = await Room.findById(roomId);
   if (!room || room.status !== "active") return room;
 
-  // Agar dono participants mein se kisi ne bhi ek dusre ko follow kiya hai, to chat LOCK NAHI HOGI!
   const [userA, userB] = room.participants;
   const hasFollowRelationship = await Follow.findOne({
     $or: [
@@ -33,12 +88,10 @@ async function lockExpiredRoom(io: Server, roomId: string) {
     ]
   });
 
-  // Agar follow kiya hua hai, to room lock karne ki koi zaroorat nahi hai (Bypass)
   if (hasFollowRelationship) {
     return room;
   }
 
-  // Agar follow nahi kiya hai aur time khatam ho gaya, tabhi lock hoga
   if (isRoomExpired(room)) {
     room.status = "locked";
     await room.save();
@@ -70,10 +123,9 @@ export function registerSocketHandlers(io: Server) {
     await User.findByIdAndUpdate(userId, { isOnline: true, lastSeenAt: new Date() });
     socket.broadcast.emit("presence_update", { userId, isOnline: true });
 
-    // --- NAYA OPTION: DIRECT CHAT ROOM (BINA MATCH QUEUE KE) ---
+    // --- DIRECT CHAT ROOM ---
     socket.on("start_direct_chat", async ({ targetUserId }, callback) => {
       try {
-        // Pehle check karo ki kya dono mein se kisi ne ek dusre ko follow kiya hai
         const isFollowed = await Follow.findOne({
           $or: [
             { followerId: userId, followingId: targetUserId },
@@ -85,7 +137,6 @@ export function registerSocketHandlers(io: Server) {
           return callback?.({ ok: false, message: "Bhai pehle follow (₹20 ya 3 ads) karna padega!" });
         }
 
-        // Direct room dhoondo ya naya banao
         let room = await Room.findOne({
           participants: { $all: [userId, targetUserId] }
         });
@@ -97,12 +148,15 @@ export function registerSocketHandlers(io: Server) {
             createdAt: new Date()
           });
         } else if (room.status === "locked") {
-          // Agar room pehle se locked tha, to follow karne ki wajah se use wapas open active kar do!
           room.status = "active";
           await room.save();
         }
 
         socket.join(room._id.toString());
+        
+        // ✅ Direct Chat chalu hote hi per-minute charging start kar do
+        startUserBilling(io, socket, userId, room._id.toString());
+        
         callback?.({ ok: true, roomId: room._id.toString() });
 
       } catch (error) {
@@ -121,7 +175,11 @@ export function registerSocketHandlers(io: Server) {
       const freshRoom = await Room.findById(roomId);
       socket.join(roomId);
       
-      // Check follow for frontend timer hide
+      // ✅ Jaise hi user room join karta hai (chahe direct ho ya match se), billing timer trigger ho jayega
+      if (freshRoom && freshRoom.status === "active") {
+        startUserBilling(io, socket, userId, roomId);
+      }
+      
       const [userA, userB] = room.participants;
       const hasFollow = await Follow.findOne({
         $or: [{ followerId: userA, followingId: userB }, { followerId: userB, followingId: userA }]
@@ -129,7 +187,7 @@ export function registerSocketHandlers(io: Server) {
 
       callback?.({
         ok: true,
-        timeLeft: hasFollow ? 999999 : (freshRoom ? getRoomTimeLeft(freshRoom) : 0), // Follow hone par unlimted time dikhayega
+        timeLeft: hasFollow ? 999999 : (freshRoom ? getRoomTimeLeft(freshRoom) : 0), 
         status: freshRoom?.status,
         serverTime: new Date().toISOString()
       });
@@ -154,7 +212,13 @@ export function registerSocketHandlers(io: Server) {
       socket.to(roomId).emit("typing", { roomId, userId, isTyping: Boolean(isTyping) });
     });
 
+    // ✅ Room chorne ya tab browser back karne par us banda ka billing interval band karein
+    socket.on("leave_room", () => {
+      stopUserBilling(userId);
+    });
+
     socket.on("disconnect", async () => {
+      stopUserBilling(userId); // Billing stop
       await User.findByIdAndUpdate(userId, { isOnline: false, lastSeenAt: new Date() });
       socket.broadcast.emit("presence_update", { userId, isOnline: false });
     });
@@ -167,7 +231,6 @@ export function registerSocketHandlers(io: Server) {
       rooms.map(async (room) => {
         const roomId = room._id.toString();
         
-        // Timer update bhejte waqt bhi follow check karenge
         const [userA, userB] = room.participants;
         const hasFollow = await Follow.findOne({
           $or: [{ followerId: userA, followingId: userB }, { followerId: userB, followingId: userA }]
