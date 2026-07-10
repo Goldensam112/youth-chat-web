@@ -324,18 +324,26 @@ export function ChatViewport({ mobile = false }: { mobile?: boolean }) {
               </p>
             </div>
 
-            {/* ➕ Instagram Style Follow/FollowBack/Friends Dynamic Action Button */}
-            <button
-              onClick={toggleFollowAction}
-              disabled={loadingFollow}
-              className={`ml-2 text-xs font-bold px-3 py-1 rounded-full transition duration-200 flex items-center gap-1 shrink-0 ${
-                followStatus.isMutual 
-                  ? "bg-white/10 text-white hover:bg-white/20" 
-                  : followStatus.isFollowing 
-                    ? "bg-zinc-700 text-zinc-300 hover:bg-zinc-600"
-                    : "bg-blue-600 text-white hover:bg-blue-500"
-              }`}
-            >
+           {/* ➕ Instagram Style Paid/Ad-based Follow Button */}
+<button
+  onClick={() => {
+    if (followStatus.isMutual || followStatus.isFollowing) {
+      // Agar pehle se followed hai toh unfollow free ho sakta hai
+      toggleFollowAction();
+    } else {
+      // Agar naya follow karna hai toh free me nahi hoga, notice dikhao ki niche diye options use karein
+      setRoomNotice("Bhai, free me follow nahi hoga! Niche diye ₹20 Recharge ya Watch Ads option ka use karein.");
+    }
+  }}
+  disabled={loadingFollow}
+  className={`ml-2 text-xs font-bold px-3 py-1 rounded-full transition duration-200 flex items-center gap-1 shrink-0 ${
+    followStatus.isMutual 
+      ? "bg-white/10 text-white hover:bg-white/20" 
+      : followStatus.isFollowing 
+        ? "bg-zinc-700 text-zinc-300 hover:bg-zinc-600"
+        : "bg-blue-600 text-white hover:bg-blue-500"
+  }`}
+>
               {followStatus.isMutual ? (
                 <>
                   <UserCheck className="h-3 w-3" /> Friends
