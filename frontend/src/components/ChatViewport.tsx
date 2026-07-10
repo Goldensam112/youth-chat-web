@@ -1,4 +1,4 @@
-\"use client";
+"use client";
 
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { Clock3, Flag, MessageSquareDashed, Send, Shield, Sparkles, TimerReset, X, Zap, UserPlus, MoreVertical, Ban, Check, UserCheck } from "lucide-react";
