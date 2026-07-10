@@ -44,7 +44,8 @@ export function ChatViewport({ mobile = false }: { mobile?: boolean }) {
 
   useEffect(() => {
     if (!roomId) return;
-    api<{ room: Room; messages: Message[]; timeLeft: number }>(`/api/rooms/${roomId}`).then((res) => {
+    // ⚡ FIX: URL interceptor compatibility setup
+    api<{ room: Room; messages: Message[]; timeLeft: number }>(`/rooms/${roomId}`).then((res) => {
       setRoom(res.room);
       setMessages(res.messages);
       setTimeLeft(res.timeLeft);
@@ -57,8 +58,8 @@ export function ChatViewport({ mobile = false }: { mobile?: boolean }) {
     const targetUserId = room.participants.find(p => p !== user?._id);
     if (!targetUserId) return;
 
-    // Backend se check karte hain uski real details
-    api<{ success: boolean; user?: { name: string; gender: string }; isFollowing?: boolean; isMutual?: boolean }>(`/api/profile/user/${targetUserId}`).then((res) => {
+    // ⚡ FIX: /api/ profile se direct /profile format change
+    api<{ success: boolean; user?: { name: string; gender: string }; isFollowing?: boolean; isMutual?: boolean }>(`/profile/user/${targetUserId}`).then((res) => {
       if (res.user) {
         setOpponentDetails({
           name: res.user.name || "Stranger",
@@ -158,7 +159,8 @@ export function ChatViewport({ mobile = false }: { mobile?: boolean }) {
     setLoadingFollow(true);
     try {
       const targetUserId = room.participants.find(p => p !== user?._id);
-      const res = await api<{ success: boolean; isFollowing: boolean; isMutual: boolean; message?: string }>(`/api/profile/user/${targetUserId}/follow`, {
+      // ⚡ FIX: Removed duplicate /api route prefix
+      const res = await api<{ success: boolean; isFollowing: boolean; isMutual: boolean; message?: string }>(`/profile/user/${targetUserId}/follow`, {
         method: "POST"
       });
 
@@ -180,9 +182,10 @@ export function ChatViewport({ mobile = false }: { mobile?: boolean }) {
     setLoadingFollow(true);
     try {
       const targetUserId = room.participants.find(p => p !== user?._id);
-      const res = await api<{ success: boolean; isFollowing: boolean; isMutual: boolean; message?: string }>(`/api/profile/user/${targetUserId}/follow`, {
+      // ⚡ FIX: Removed extra /api from URL path
+      const res = await api<{ success: boolean; isFollowing: boolean; isMutual: boolean; message?: string }>(`/profile/user/${targetUserId}/follow`, {
         method: "POST",
-        body: JSON.stringify({ viaRecharge: true }) // Backend validation verified pack parameters trigger
+        body: JSON.stringify({ viaRecharge: true }) 
       });
 
       if (res.success) {
@@ -205,9 +208,10 @@ export function ChatViewport({ mobile = false }: { mobile?: boolean }) {
     if (!room || !user) return;
     try {
       const targetUserId = room.participants.find(p => p !== user?._id);
-      const res = await api<{ success: boolean; isFollowing: boolean; isMutual: boolean }>(`/api/profile/user/${targetUserId}/follow`, {
+      // ⚡ FIX: Removed extra /api from URL path
+      const res = await api<{ success: boolean; isFollowing: boolean; isMutual: boolean }>(`/profile/user/${targetUserId}/follow`, {
         method: "POST",
-        body: JSON.stringify({ viaAd: true }) // Backend validation verified ad parameters trigger
+        body: JSON.stringify({ viaAd: true }) 
       });
 
       if (res.success) {
@@ -229,13 +233,14 @@ export function ChatViewport({ mobile = false }: { mobile?: boolean }) {
     
     try {
       const targetUserId = room.participants.find(p => p !== user?._id);
-      const res = await api<{ success: boolean; message?: string }>(`/api/profile/user/${targetUserId}/block`, {
+      // ⚡ FIX: Removed duplicate /api prefix
+      const res = await api<{ success: boolean; message?: string }>(`/profile/user/${targetUserId}/block`, {
         method: "POST"
       });
 
       if (res.success) {
         alert("User ko block kar diya gaya hai.");
-        closeRoom(); // Chat close kar do block karte hi
+        closeRoom(); 
       }
     } catch (err) {
       setRoomNotice("Block operation failed.");
@@ -244,7 +249,8 @@ export function ChatViewport({ mobile = false }: { mobile?: boolean }) {
 
   async function reportRoom() {
     if (!room) return;
-    await api(`/api/rooms/${room._id}/report`, {
+    // ⚡ FIX: Removed duplicate /api prefix
+    await api(`/rooms/${room._id}/report`, {
       method: "POST",
       body: JSON.stringify({ reason: "User reported from chat", details: "Quick report from live room UI." })
     });
@@ -254,7 +260,8 @@ export function ChatViewport({ mobile = false }: { mobile?: boolean }) {
 
   async function closeRoom() {
     if (!room) return;
-    await api(`/api/rooms/${room._id}/close`, { method: "POST" });
+    // ⚡ FIX: Removed duplicate /api prefix
+    await api(`/rooms/${room._id}/close`, { method: "POST" });
     setRoom(null);
     setMessages([]);
     setRoomNotice("");
@@ -329,11 +336,9 @@ export function ChatViewport({ mobile = false }: { mobile?: boolean }) {
             <button
               onClick={() => {
                 if (followStatus.isMutual || followStatus.isFollowing) {
-                  // Pehle se followed hai toh unfollow free ho sakta hai
                   toggleFollowAction();
                 } else {
-                  // Naya follow free me block hai, warning display state trigger
-                  setRoomNotice("Bhai, free me follow nahi hoga! Niche diye ₹20 Recharge ya Watch Ads option ka use korein.");
+                  setRoomNotice("Bhai, free me follow nahi hoga! Niche diye ₹20 Recharge ya Watch Ads option ka use karein.");
                 }
               }}
               disabled={loadingFollow}
