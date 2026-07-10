@@ -2,8 +2,8 @@ import { Router } from "express";
 import { z } from "zod";
 import { requireAuth } from "../utils/auth.js";
 import { User } from "../models/User.js";
-import { Follow } from "../models/Follow.js"; // Connections manage karne ke liye
-import { Block } from "../models/Block.js";   // Block manage karne ke liye
+import { Follow } from "../models/Follow.js"; 
+import { Block } from "../models/Block.js";   
 
 const router = Router();
 
@@ -15,7 +15,6 @@ const updateProfileSchema = z.object({
   profilePictures: z.array(z.object({ url: z.string().url(), isPrimary: z.boolean().default(false) })).max(6).optional()
 });
 
-// 🔒 Purana Profile Update Feature (Bilkul Safe Hai)
 router.patch("/", requireAuth, async (req, res, next) => {
   try {
     const input = updateProfileSchema.parse(req.body);
@@ -33,18 +32,25 @@ router.patch("/", requireAuth, async (req, res, next) => {
   }
 });
 
-// ➕ UPGRADED ROUTE: Instagram Style Follow / Unfollow & Follow Back (FREE FOLLOW BAN!)
+// ➕ INSTAGRAM STYLE PAID/AD EXCLUSIVE CONTROLLER ROUTE
 router.post("/user/:id/follow", requireAuth, async (req, res, next) => {
   try {
     const followerId = String(req.user!._id); 
     const followingId = String(req.params.id); 
-    const { viaAd, viaRecharge } = req.body; // Frontend se aane wala payment/ad validation check
+    
+    // ⚡ FIX: Express compatibility parse standard for body reading
+    let bodyData = req.body;
+    if (typeof bodyData === 'string') {
+      try { bodyData = JSON.parse(bodyData); } catch(e) {}
+    }
+
+    const viaAd = bodyData?.viaAd || req.query?.viaAd === 'true';
+    const viaRecharge = bodyData?.viaRecharge || req.query?.viaRecharge === 'true';
 
     if (followerId === followingId) {
       return res.status(400).json({ success: false, message: "Aap khud ko connection mein add nahi kar sakte!" });
     }
 
-    // Check karo kya samne wale ne aapko block kar rakha hai ya aapne usko?
     const isBlocked = await Block.findOne({
       $or: [
         { blockerId: followerId, blockedId: followingId },
@@ -56,19 +62,14 @@ router.post("/user/:id/follow", requireAuth, async (req, res, next) => {
       return res.status(403).json({ success: false, message: "Action not allowed." });
     }
 
-    // Check karo kya pehle se follow kiya hua hai
     const existingFollow = await Follow.findOne({ followerId, followingId });
 
     if (existingFollow) {
-      // 1. Agar pehle se hai, toh unfollow (connection se hatao) -> Yeh free me ho sakta hai
       await Follow.deleteOne({ _id: existingFollow._id });
-      
-      // Dosti toot gayi, toh samne wale ka isMutual bhi false kar do
       await Follow.updateOne({ followerId: followingId, followingId: followerId }, { isMutual: false });
-
       return res.json({ success: true, isFollowing: false, isMutual: false, message: "Connection se hataya gaya" });
     } else {
-      // 2. Agar naya follow karna hai, toh strict check ki Free me na ho paye!
+      // ⚡ STRICT ACTION CHECK: Free click security filter
       if (!viaAd && !viaRecharge) {
         return res.status(403).json({ 
           success: false, 
@@ -76,17 +77,16 @@ router.post("/user/:id/follow", requireAuth, async (req, res, next) => {
         });
       }
 
-      // Check karo ki kya samne wale ne bhi follow kiya hua hai? (Follow Back)
       const frontFollow = await Follow.findOne({ followerId: followingId, followingId: followerId });
       const mutual = frontFollow ? true : false;
 
       await Follow.create({ followerId, followingId, isMutual: mutual });
 
-      // Agar samne wale ne pehle se follow kiya tha, toh uski file me bhi isMutual true kar do
       if (mutual) {
         await Follow.updateOne({ followerId: followingId, followingId: followerId }, { isMutual: true });
       }
 
+      // ⚡ Return structured followStatus properties to frontend directly
       return res.json({ 
         success: true, 
         isFollowing: true, 
@@ -100,7 +100,6 @@ router.post("/user/:id/follow", requireAuth, async (req, res, next) => {
   }
 });
 
-// 🛠️ NAYA ROUTE: Instagram Style Block / Unblock Feature
 router.post("/user/:id/block", requireAuth, async (req, res, next) => {
   try {
     const myId = String(req.user!._id);
@@ -110,25 +109,19 @@ router.post("/user/:id/block", requireAuth, async (req, res, next) => {
       return res.status(400).json({ success: false, message: "Aap khud ko block nahi kar sakte!" });
     }
 
-    // Check karo kya pehle se block hai?
     const existingBlock = await Block.findOne({ blockerId: myId, blockedId: targetId });
 
     if (existingBlock) {
-      // Agar pehle se block hai, toh ab Unblock kar do
       await Block.deleteOne({ _id: existingBlock._id });
       return res.json({ success: true, isBlocked: false, message: "User ko unblock kiya gaya" });
     } else {
-      // Agar block nahi tha, toh naya Block banao
       await Block.create({ blockerId: myId, blockedId: targetId });
-
-      // Block karte hi ek dusre ka follow data turant saaf kar do (Instagram rule)
       await Follow.deleteMany({
         $or: [
           { followerId: myId, followingId: targetId },
           { followerId: targetId, followingId: myId }
         ]
       });
-
       return res.json({ success: true, isBlocked: true, message: "User ko block kar diya gaya hai" });
     }
   } catch (error) {
@@ -137,12 +130,9 @@ router.post("/user/:id/block", requireAuth, async (req, res, next) => {
   }
 });
 
-// 🛠️ Purane Connections ki list nikalna
 router.get("/my-connections", requireAuth, async (req, res, next) => {
   try {
     const myId = String(req.user!._id); 
-
-    // Un logo ko dhoondho jinhe is user ne follow kiya hai
     const connections = await Follow.find({ followerId: myId })
       .populate("followingId", "name username bio profilePictures")
       .lean();
@@ -158,17 +148,13 @@ router.get("/my-connections", requireAuth, async (req, res, next) => {
   }
 });
 
-// 🚫 NAYA ROUTE: User ki Blocklist (Blocked Accounts) frontend ko bhejna
 router.get("/my-blocks", requireAuth, async (req, res, next) => {
   try {
     const myId = String(req.user!._id);
-
-    // Un logo ko dhoondho jinhe is user ne block kiya hai
     const blocks = await Block.find({ blockerId: myId })
-      .populate("blockedId", "name username bio profilePictures") // Blocked user ki details nikalna
+      .populate("blockedId", "name username bio profilePictures") 
       .lean();
 
-    // Data ko saaf karke list banana
     const formattedBlocks = blocks
       .map((b) => b.blockedId)
       .filter(Boolean);
