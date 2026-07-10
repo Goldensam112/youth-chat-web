@@ -148,5 +148,25 @@ router.get("/my-connections", requireAuth, async (req, res, next) => {
     res.status(500).json({ success: false, message: "Backend crash logs triggered inside get connections." });
   }
 });
+// 🚫 NAYA ROUTE: User ki Blocklist (Blocked Accounts) frontend ko bhejna
+router.get("/my-blocks", requireAuth, async (req, res, next) => {
+  try {
+    const myId = String(req.user!._id);
 
+    // Un logo ko dhoondho jinhe is user ne block kiya hai
+    const blocks = await Block.find({ blockerId: myId })
+      .populate("blockedId", "name username bio profilePictures") // Blocked user ki details nikalna
+      .lean();
+
+    // Data ko saaf karke list banana
+    const formattedBlocks = blocks
+      .map((b) => b.blockedId)
+      .filter(Boolean);
+
+    res.json({ success: true, data: formattedBlocks });
+  } catch (error) {
+    console.error("Get Blocks Backend Error:", error);
+    res.status(500).json({ success: false, message: "Backend error inside get blocks." });
+  }
+});
 export default router;
