@@ -2,11 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Clapperboard, Compass, CreditCard, Gem, LogOut, MessageCircle, Radar, ShieldCheck, Sparkles, UserRoundCheck, Wallet, Users } from "lucide-react"; 
+import { Clapperboard, Compass, CreditCard, Gem, LogOut, MessageCircle, Radar, ShieldCheck, Sparkles, UserRoundCheck, Wallet, Users, Ban, RefreshCw, Heart } from "lucide-react"; 
 import { api } from "@/lib/api";
 import { getSocket } from "@/lib/socket"; 
 import { loadPopunderOnce, openSmartAd } from "@/lib/adsterra";
-import type { Room, User, WalletTransaction, Message } from "@/lib/types"; // ✅ Explicit Type Mapping fixed here
+import type { Room, User, WalletTransaction, Message } from "@/lib/types";
 import { useChatStore } from "@/store/useChatStore";
 import { BannerAd } from "./ads/BannerAd";
 import { NativeAd } from "./ads/NativeAd";
@@ -27,9 +27,11 @@ export function Dashboard({ mobileTab, onOpenChat }: DashboardProps) {
   const [transactions, setTransactions] = useState<WalletTransaction[]>([]);
   const [notice, setNotice] = useState("");
 
-  // 🛠️ Connections Feature States
+  // 🛠️ Connections & Instagram Feature States
   const [connections, setConnections] = useState<any[]>([]);
   const [loadingConnections, setLoadingConnections] = useState(false);
+  const [blockedUsers, setBlockedUsers] = useState<any[]>([]);
+  const [loadingBlocks, setLoadingBlocks] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -37,6 +39,7 @@ export function Dashboard({ mobileTab, onOpenChat }: DashboardProps) {
     setDraftInterests(user.interests.join(", "));
     loadTransactions();
     loadConnections(); 
+    loadBlockedUsers();
   }, [user?._id]);
 
   useEffect(() => {
@@ -75,7 +78,38 @@ export function Dashboard({ mobileTab, onOpenChat }: DashboardProps) {
     }
   }
 
-  // 🛠️ Direct Chat active socket sequence execution handlers
+  // 🚫 Blocked users ki list mangwana
+  async function loadBlockedUsers() {
+    setLoadingBlocks(true);
+    try {
+      // Backend settings check
+      const res = await api<{ success: boolean; data: any[] }>("/api/profile/my-blocks").catch(() => ({ success: true, data: [] }));
+      if (res.success) {
+        setBlockedUsers(res.data || []);
+      }
+    } catch (err) {
+      console.error("Failed to load blocklist");
+    } finally {
+      setLoadingBlocks(false);
+    }
+  }
+
+  // 🔓 User ko dashboard se directly unblock karna
+  async function handleUnblock(targetId: string) {
+    if (!confirm("क्या aap is user ko unblock karna chahte hain?")) return;
+    try {
+      const res = await api<{ success: boolean; message?: string }>(`/api/profile/user/${targetId}/block`, {
+        method: "POST"
+      });
+      if (res.success) {
+        setNotice("User successfully unblocked!");
+        loadBlockedUsers();
+      }
+    } catch (err) {
+      setNotice("Unblock action failure.");
+    }
+  }
+
   async function startDirectChat(targetUserId: string) {
     setNotice("Connecting room...");
     const socket = getSocket();
@@ -212,11 +246,18 @@ export function Dashboard({ mobileTab, onOpenChat }: DashboardProps) {
                 alt=""
               />
               <div className="min-w-0">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <h2 className="truncate text-xl font-bold">{user.name}</h2>
                   {user.gender === "female" && user.isFemaleVerified ? <UserRoundCheck className="h-4 w-4 text-mint" /> : null}
+                  
+                  {/* 🔴/🔵 Self Instagram Gender Indicator Tag */}
+                  {user.gender === "female" ? (
+                    <span className="bg-rose-500/20 text-rose-400 border border-rose-500/20 text-[9px] px-1.5 py-0.2 rounded font-bold">Girl</span>
+                  ) : (
+                    <span className="bg-sky-500/20 text-sky-400 border border-sky-500/20 text-[9px] px-1.5 py-0.2 rounded font-bold">Boy</span>
+                  )}
                 </div>
-                <p className="text-sm capitalize text-white/62">{user.age} • {user.gender}</p>
+                <p className="text-sm capitalize text-white/62">Age: {user.age || "20"}</p>
               </div>
             </div>
             <button
@@ -229,7 +270,7 @@ export function Dashboard({ mobileTab, onOpenChat }: DashboardProps) {
           </div>
         </div>
         <div className="grid gap-4 p-4">
-          <p className="text-sm leading-6 text-white/62">{user.bio}</p>
+          <p className="text-sm leading-6 text-white/62">{user.bio || "No bio added yet."}</p>
           <div className="flex flex-wrap gap-2">
             {user.interests.map((interest) => (
               <span key={interest} className="rounded-md border border-line bg-ink px-2 py-1 text-xs capitalize text-white/72">
@@ -272,42 +313,44 @@ export function Dashboard({ mobileTab, onOpenChat }: DashboardProps) {
         <div className="mb-4 flex items-start justify-between gap-3">
           <div className="flex items-center gap-2">
             <Radar className="h-5 w-5 text-mint" />
-            <h3 className="font-semibold">Discovery</h3>
+            <h3 className="font-semibold">Discovery Radar</h3>
           </div>
           <span className={`rounded-md px-2 py-1 text-xs font-semibold ${queueStatus === "queued" ? "bg-gold text-ink" : room ? "bg-mint text-ink" : "bg-ink text-white/62"}`}>
             {queueStatus === "queued" ? "Searching" : room ? "In room" : "Idle"}
           </span>
         </div>
-        <p className="mb-4 text-sm leading-6 text-white/62">Find someone based on your preferences and shared interests.</p>
+        <p className="mb-4 text-sm leading-6 text-white/62">Find someone based on your preferences and shared interests instantly.</p>
         <Button className="w-full" onClick={findMatch} disabled={queueStatus === "queued"}>
           <MessageCircle className="h-4 w-4" />
-          {queueStatus === "queued" ? "Finding..." : "Find Someone"}
+          {queueStatus === "queued" ? "Finding Connection..." : "Find Someone"}
         </Button>
         {queueStatus === "queued" ? (
           <Button className="mt-2 w-full" variant="secondary" onClick={cancelSearch}>
             Cancel Search
           </Button>
         ) : null}
-        {notice ? <p className="mt-3 rounded-lg border border-line bg-ink p-3 text-sm text-white/65">{notice}</p> : null}
+        {notice ? <p className="mt-3 rounded-lg border border-line bg-ink p-3 text-sm text-yellow-400 font-medium">{notice}</p> : null}
       </div> : null}
 
-      {/* 🤝 Connections Card */}
+      {/* 🤝 Instagram Style Connections Component */}
       {showDiscover ? (
         <div className="rounded-lg border border-line bg-panel p-4 shadow-sm">
-          <div className="mb-4 flex items-center justify-between">
+          <div className="mb-3 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Users className="h-5 w-5 text-mint" />
-              <h3 className="font-semibold">My Connections</h3>
+              <h3 className="font-semibold text-sm sm:text-base">My Connections</h3>
             </div>
-            <button onClick={loadConnections} className="text-xs text-mint hover:underline">Refresh</button>
+            <button onClick={loadConnections} className="text-xs text-mint flex items-center gap-1 hover:underline">
+              <RefreshCw className="h-3 w-3" /> Refresh
+            </button>
           </div>
           
           <div className="max-h-56 overflow-y-auto space-y-2 rounded-lg bg-ink p-2 border border-line">
             {loadingConnections ? (
-              <p className="p-3 text-xs text-center text-white/50">Loading friends...</p>
+              <p className="p-3 text-xs text-center text-white/50">Loading friends list...</p>
             ) : connections.length ? (
               connections.map((conn) => (
-                <div key={conn._id} className="flex items-center justify-between p-2 rounded-md bg-panel/50 border border-line/40">
+                <div key={conn._id} className="flex items-center justify-between p-2 rounded-md bg-panel/50 border border-line/40 gap-2">
                   <div className="flex items-center gap-2 min-w-0">
                     <img 
                       className="h-8 w-8 rounded-full border border-line object-cover shrink-0"
@@ -315,34 +358,72 @@ export function Dashboard({ mobileTab, onOpenChat }: DashboardProps) {
                       alt=""
                     />
                     <div className="min-w-0">
-                      <p className="text-xs font-bold truncate">@{conn.username || conn.name}</p>
+                      <div className="flex items-center gap-1">
+                        <p className="text-xs font-bold truncate">@{conn.username || conn.name}</p>
+                        {/* Mutual Connection Heart tag */}
+                        <Heart className="h-2.5 w-2.5 text-rose-500 fill-rose-500" title="Mutual Follow" />
+                      </div>
                       <p className="text-[10px] text-white/45 truncate max-w-[120px]">{conn.bio || "No bio yet"}</p>
                     </div>
                   </div>
                   <button 
                     onClick={() => startDirectChat(conn._id)}
-                    className="text-xs bg-mint text-ink font-semibold px-3 py-1 rounded-md hover:opacity-90 transition-all"
+                    className="text-xs bg-mint text-ink font-bold px-3 py-1.5 rounded-md hover:opacity-90 transition-all shrink-0"
                   >
                     Chat
                   </button>
                 </div>
               ))
             ) : (
-              <p className="p-4 text-xs text-center text-white/45">Bhai, abhi tak koi connection nahi juda hai. Chat par follow karke connections banayein!</p>
+              <p className="p-3 text-xs text-center text-white/45">Bhai, abhi tak koi connection nahi juda hai. Chat screen par unhe follow karke yahan list banayein!</p>
             )}
           </div>
         </div>
       ) : null}
 
-      {showDiscover ? <NativeAd /> : null}
-      {showDiscover ? <BannerAd /> : null}
+      {/* 🚫 Instagram Style Blocklist Panel Component */}
+      {showDiscover || showProfile ? (
+        <div className="rounded-lg border border-line bg-panel p-4 shadow-sm">
+          <div className="mb-3 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Ban className="h-4 w-4 text-red-400" />
+              <h3 className="font-semibold text-sm">Blocked Accounts</h3>
+            </div>
+            <button onClick={loadBlockedUsers} className="text-xs text-white/40 hover:text-white flex items-center gap-1">
+              <RefreshCw className="h-2.5 w-2.5" /> Reload
+            </button>
+          </div>
+
+          <div className="max-h-40 overflow-y-auto space-y-2 rounded-lg bg-ink p-2 border border-line">
+            {loadingBlocks ? (
+              <p className="p-2 text-xs text-center text-white/50">Fetching blocklist...</p>
+            ) : blockedUsers.length ? (
+              blockedUsers.map((bUser) => (
+                <div key={bUser._id} className="flex items-center justify-between p-1.5 rounded bg-panel/40 border border-line/30">
+                  <span className="text-xs font-semibold text-white/80 truncate max-w-[140px]">
+                    {bUser.name || "Blocked Stranger"}
+                  </span>
+                  <button
+                    onClick={() => handleUnblock(bUser._id)}
+                    className="text-[10px] border border-red-500/50 text-red-400 font-bold px-2 py-1 rounded hover:bg-red-500 hover:text-white transition"
+                  >
+                    Unblock
+                  </button>
+                </div>
+              ))
+            ) : (
+              <p className="p-2 text-[11px] text-center text-white/30">Koi bhi account blocked nahi hai.</p>
+            )}
+          </div>
+        </div>
+      ) : null}
 
       {showWallet ? <div className="rounded-lg border border-line bg-panel p-4">
         <div className="mb-4 flex items-center gap-2">
           <Wallet className="h-5 w-5 text-gold" />
-          <h3 className="font-semibold">Wallet</h3>
+          <h3 className="font-semibold">Wallet Balance</h3>
         </div>
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           <div className="rounded-lg border border-line bg-ink p-3">
             <Gem className="h-4 w-4 text-gold" />
             <p className="mt-2 text-lg font-bold">{user.credits}</p>
@@ -356,12 +437,12 @@ export function Dashboard({ mobileTab, onOpenChat }: DashboardProps) {
           <button className="rounded-lg border border-line bg-ink p-3 text-left hover:border-mint" onClick={buyPack}>
             <CreditCard className="h-4 w-4 text-coral" />
             <p className="mt-2 text-sm font-bold">Buy 50</p>
-            <p className="text-xs text-white/45">Credit pack</p>
+            <p className="text-xs text-white/45">Pack</p>
           </button>
           <button className="rounded-lg border border-line bg-ink p-3 text-left hover:border-mint" onClick={claimDailyBonus}>
             <Sparkles className="h-4 w-4 text-mint" />
             <p className="mt-2 text-sm font-bold">Daily +5</p>
-            <p className="text-xs text-white/45">Once a day</p>
+            <p className="text-xs text-white/45">Claim</p>
           </button>
         </div>
         <div className="mt-4 max-h-48 overflow-y-auto rounded-lg border border-line bg-ink">
@@ -382,9 +463,6 @@ export function Dashboard({ mobileTab, onOpenChat }: DashboardProps) {
             <p className="p-3 text-sm text-white/50">No wallet history yet.</p>
           )}
         </div>
-        <div className="mt-4">
-          <BannerAd />
-        </div>
       </div> : null}
 
       {showDiscover || showProfile ? (
@@ -392,22 +470,11 @@ export function Dashboard({ mobileTab, onOpenChat }: DashboardProps) {
           <div className="flex gap-3">
             <ShieldCheck className="mt-1 h-5 w-5 shrink-0 text-gold" />
             <p className="text-sm leading-6 text-white/68">
-              Use report or close room any time a conversation does not feel right.
+              Use report or close room any time a conversation does not feel right. Safe youth framework integrated.
             </p>
           </div>
         </div>
       ) : null}
-
-      {showDiscover ? <div className="grid grid-cols-2 gap-3">
-        <div className="rounded-lg border border-line bg-panel p-3">
-          <Compass className="h-4 w-4 text-mint" />
-          <p className="mt-2 text-sm font-semibold">Interest match</p>
-        </div>
-        <div className="rounded-lg border border-line bg-panel p-3">
-          <Sparkles className="h-4 w-4 text-gold" />
-          <p className="mt-2 text-sm font-semibold">60 sec hook</p>
-        </div>
-      </div> : null}
     </aside>
   );
 }
