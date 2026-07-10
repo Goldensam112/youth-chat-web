@@ -44,7 +44,6 @@ export function ChatViewport({ mobile = false }: { mobile?: boolean }) {
 
   useEffect(() => {
     if (!roomId) return;
-    // ⚡ FIX: URL interceptor compatibility setup
     api<{ room: Room; messages: Message[]; timeLeft: number }>(`/rooms/${roomId}`).then((res) => {
       setRoom(res.room);
       setMessages(res.messages);
@@ -58,7 +57,6 @@ export function ChatViewport({ mobile = false }: { mobile?: boolean }) {
     const targetUserId = room.participants.find(p => p !== user?._id);
     if (!targetUserId) return;
 
-    // ⚡ FIX: /api/ profile se direct /profile format change
     api<{ success: boolean; user?: { name: string; gender: string }; isFollowing?: boolean; isMutual?: boolean }>(`/profile/user/${targetUserId}`).then((res) => {
       if (res.user) {
         setOpponentDetails({
@@ -159,7 +157,6 @@ export function ChatViewport({ mobile = false }: { mobile?: boolean }) {
     setLoadingFollow(true);
     try {
       const targetUserId = room.participants.find(p => p !== user?._id);
-      // ⚡ FIX: Removed duplicate /api route prefix
       const res = await api<{ success: boolean; isFollowing: boolean; isMutual: boolean; message?: string }>(`/profile/user/${targetUserId}/follow`, {
         method: "POST"
       });
@@ -177,14 +174,15 @@ export function ChatViewport({ mobile = false }: { mobile?: boolean }) {
     }
   }
 
+  // 🛠️ FIX: Added headers content-type metadata mapping
   async function followViaRecharge() {
     if (!room || !user) return;
     setLoadingFollow(true);
     try {
       const targetUserId = room.participants.find(p => p !== user?._id);
-      // ⚡ FIX: Removed extra /api from URL path
       const res = await api<{ success: boolean; isFollowing: boolean; isMutual: boolean; message?: string }>(`/profile/user/${targetUserId}/follow`, {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ viaRecharge: true }) 
       });
 
@@ -203,14 +201,15 @@ export function ChatViewport({ mobile = false }: { mobile?: boolean }) {
     }
   }
 
+  // 🛠️ FIX: Added headers content-type metadata mapping
   async function handleAdsSuccess() {
     setIsAdPopupOpen(false);
     if (!room || !user) return;
     try {
       const targetUserId = room.participants.find(p => p !== user?._id);
-      // ⚡ FIX: Removed extra /api from URL path
       const res = await api<{ success: boolean; isFollowing: boolean; isMutual: boolean }>(`/profile/user/${targetUserId}/follow`, {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ viaAd: true }) 
       });
 
@@ -233,7 +232,6 @@ export function ChatViewport({ mobile = false }: { mobile?: boolean }) {
     
     try {
       const targetUserId = room.participants.find(p => p !== user?._id);
-      // ⚡ FIX: Removed duplicate /api prefix
       const res = await api<{ success: boolean; message?: string }>(`/profile/user/${targetUserId}/block`, {
         method: "POST"
       });
@@ -249,7 +247,6 @@ export function ChatViewport({ mobile = false }: { mobile?: boolean }) {
 
   async function reportRoom() {
     if (!room) return;
-    // ⚡ FIX: Removed duplicate /api prefix
     await api(`/rooms/${room._id}/report`, {
       method: "POST",
       body: JSON.stringify({ reason: "User reported from chat", details: "Quick report from live room UI." })
@@ -260,7 +257,6 @@ export function ChatViewport({ mobile = false }: { mobile?: boolean }) {
 
   async function closeRoom() {
     if (!room) return;
-    // ⚡ FIX: Removed duplicate /api prefix
     await api(`/rooms/${room._id}/close`, { method: "POST" });
     setRoom(null);
     setMessages([]);
@@ -304,18 +300,15 @@ export function ChatViewport({ mobile = false }: { mobile?: boolean }) {
   return (
     <section className={`relative grid grid-rows-[auto_1fr_auto] overflow-hidden rounded-lg border border-line bg-panel ${mobile ? "h-[calc(100svh-8.5rem)]" : "min-h-[calc(100svh-2rem)]"}`}>
       
-      {/* 📸 Upgraded Instagram Style Header */}
       <header className="border-b border-line bg-ink/50 p-3 sm:p-4 relative">
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0 flex items-center gap-2">
             <div>
               <div className="flex items-center gap-1.5 flex-wrap">
-                {/* 🌟 Dynamic Username display */}
                 <h2 className="font-bold text-base truncate max-w-[120px] sm:max-w-[200px]">
                   {opponentDetails?.name || "Stranger"}
                 </h2>
                 
-                {/* 🔴/🔵 Instagram Style Gender Badge */}
                 {opponentDetails?.gender === "female" && (
                   <span className="bg-rose-500/20 text-rose-400 border border-rose-500/30 text-[10px] px-1.5 py-0.5 rounded-full font-bold flex items-center">
                     🔴 Girl
@@ -332,7 +325,6 @@ export function ChatViewport({ mobile = false }: { mobile?: boolean }) {
               </p>
             </div>
 
-            {/* ➕ Instagram Style Paid/Ad-based Follow Button */}
             <button
               onClick={() => {
                 if (followStatus.isMutual || followStatus.isFollowing) {
@@ -361,13 +353,11 @@ export function ChatViewport({ mobile = false }: { mobile?: boolean }) {
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
-            {/* ⏱️ Dynamic Server Clock Display */}
             <div className={`inline-flex h-9 items-center gap-1.5 rounded-lg px-2.5 text-xs font-bold ${timeLeft < 10 ? "bg-coral text-white" : "bg-mint text-ink"}`}>
               <Clock3 className="h-3.5 w-3.5" />
               {displayTimer}
             </div>
 
-            {/* 3-Dots Dropdown Options Controller Menu */}
             <div className="relative" ref={menuRef}>
               <button 
                 onClick={() => setShowMenu(!showMenu)}
