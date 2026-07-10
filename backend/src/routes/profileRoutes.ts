@@ -3,7 +3,7 @@ import { z } from "zod";
 import { requireAuth } from "../utils/auth.js";
 import { User } from "../models/User.js";
 import { Follow } from "../models/Follow.js"; // Connections manage karne ke liye
-import { Block } from "../models/Block.js";   // Block manage karne ke liye [Naya]
+import { Block } from "../models/Block.js";   // Block manage karne ke liye
 
 const router = Router();
 
@@ -33,11 +33,12 @@ router.patch("/", requireAuth, async (req, res, next) => {
   }
 });
 
-// ➕ UPGRADED ROUTE: Instagram Style Follow / Unfollow & Follow Back
+// ➕ UPGRADED ROUTE: Instagram Style Follow / Unfollow & Follow Back (FREE FOLLOW BAN!)
 router.post("/user/:id/follow", requireAuth, async (req, res, next) => {
   try {
     const followerId = String(req.user!._id); 
     const followingId = String(req.params.id); 
+    const { viaAd, viaRecharge } = req.body; // Frontend se aane wala payment/ad validation check
 
     if (followerId === followingId) {
       return res.status(400).json({ success: false, message: "Aap khud ko connection mein add nahi kar sakte!" });
@@ -59,7 +60,7 @@ router.post("/user/:id/follow", requireAuth, async (req, res, next) => {
     const existingFollow = await Follow.findOne({ followerId, followingId });
 
     if (existingFollow) {
-      // 1. Agar pehle se h, toh unfollow (connection se hatao)
+      // 1. Agar pehle se hai, toh unfollow (connection se hatao) -> Yeh free me ho sakta hai
       await Follow.deleteOne({ _id: existingFollow._id });
       
       // Dosti toot gayi, toh samne wale ka isMutual bhi false kar do
@@ -67,7 +68,15 @@ router.post("/user/:id/follow", requireAuth, async (req, res, next) => {
 
       return res.json({ success: true, isFollowing: false, isMutual: false, message: "Connection se hataya gaya" });
     } else {
-      // 2. Agar nahi h, toh follow karo aur check karo ki kya samne wale ne bhi follow kiya hua hai? (Follow Back)
+      // 2. Agar naya follow karna hai, toh strict check ki Free me na ho paye!
+      if (!viaAd && !viaRecharge) {
+        return res.status(403).json({ 
+          success: false, 
+          message: "Free me follow nahi hoga bhai! 3 Ads dekho ya ₹20 ka recharge karo." 
+        });
+      }
+
+      // Check karo ki kya samne wale ne bhi follow kiya hua hai? (Follow Back)
       const frontFollow = await Follow.findOne({ followerId: followingId, followingId: followerId });
       const mutual = frontFollow ? true : false;
 
@@ -148,6 +157,7 @@ router.get("/my-connections", requireAuth, async (req, res, next) => {
     res.status(500).json({ success: false, message: "Backend crash logs triggered inside get connections." });
   }
 });
+
 // 🚫 NAYA ROUTE: User ki Blocklist (Blocked Accounts) frontend ko bhejna
 router.get("/my-blocks", requireAuth, async (req, res, next) => {
   try {
@@ -169,4 +179,5 @@ router.get("/my-blocks", requireAuth, async (req, res, next) => {
     res.status(500).json({ success: false, message: "Backend error inside get blocks." });
   }
 });
+
 export default router;
