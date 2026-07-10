@@ -1,4 +1,4 @@
-"use client";
+\"use client";
 
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { Clock3, Flag, MessageSquareDashed, Send, Shield, Sparkles, TimerReset, X, Zap, UserPlus, MoreVertical, Ban, Check, UserCheck } from "lucide-react";
@@ -22,7 +22,6 @@ export function ChatViewport({ mobile = false }: { mobile?: boolean }) {
   const [isAdPopupOpen, setIsAdPopupOpen] = useState(false);
   const [loadingFollow, setLoadingFollow] = useState(false);
   
-  // Instagram Style Extra States
   const [showMenu, setShowMenu] = useState(false);
   const [followStatus, setFollowStatus] = useState<{ isFollowing: boolean; isMutual: boolean }>({ isFollowing: false, isMutual: false });
   const [opponentDetails, setOpponentDetails] = useState<{ name: string; gender: string } | null>(null);
@@ -41,14 +40,11 @@ export function ChatViewport({ mobile = false }: { mobile?: boolean }) {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // ⏱️ NAYA LIVE RUNNING TIMER SUB-LOOP EFFECT: Agar socket update delay ho, toh client khud time ghataye live ticking ke liye
   useEffect(() => {
     if (!roomId || room?.status !== "active" || timeLeft <= 0) return;
-    
     const localTimer = setInterval(() => {
       setTimeLeft(Math.max(0, timeLeft - 1));
     }, 1000);
-
     return () => clearInterval(localTimer);
   }, [roomId, room?.status, timeLeft, setTimeLeft]);
 
@@ -58,9 +54,10 @@ export function ChatViewport({ mobile = false }: { mobile?: boolean }) {
       setRoom(res.room);
       setMessages(res.messages);
       setTimeLeft(res.timeLeft);
-    }).catch((err) => console.error("Room sync query error", err));
+    }).catch((err) => console.error("Room sync error", err));
   }, [roomId, setMessages, setRoom, setTimeLeft]);
 
+  // Sync state verification directly from corrected GET route handler mapping
   useEffect(() => {
     if (!room || !user) return;
     const targetUserId = room.participants.find(p => p !== user?._id);
@@ -96,9 +93,7 @@ export function ChatViewport({ mobile = false }: { mobile?: boolean }) {
 
     const handleMessage = ({ message }: { message: Message }) => addMessage(message);
     const handleTimer = ({ roomId: eventRoomId, timeLeft: nextTimeLeft }: { roomId: string; timeLeft: number }) => {
-      if (eventRoomId === roomId) {
-        setTimeLeft(nextTimeLeft);
-      }
+      if (eventRoomId === roomId) setTimeLeft(nextTimeLeft);
     };
     const handleLock = ({ roomId: eventRoomId }: { roomId: string }) => {
       if (eventRoomId !== roomId) return;
@@ -333,6 +328,7 @@ export function ChatViewport({ mobile = false }: { mobile?: boolean }) {
 
             <button
               onClick={() => {
+                // ⚡ FIX: Agar pehle se following/mutual hai toh direct click par unfollow karne do
                 if (followStatus.isMutual || followStatus.isFollowing) {
                   toggleFollowAction();
                 } else {
@@ -398,26 +394,29 @@ export function ChatViewport({ mobile = false }: { mobile?: boolean }) {
           </div>
         </div>
         
-        <div className="mt-3 p-2 bg-purple-950/40 border border-purple-500/30 rounded-lg flex flex-wrap items-center justify-between gap-2">
-          <div className="text-xs text-purple-300 font-medium flex items-center gap-1">
-            <UserPlus className="h-3 w-3 text-purple-400" /> Premium Follow Features Allocation System:
+        {/* ⚡ Hide options if already followed to prevent double spending */}
+        {!followStatus.isFollowing && !followStatus.isMutual && (
+          <div className="mt-3 p-2 bg-purple-950/40 border border-purple-500/30 rounded-lg flex flex-wrap items-center justify-between gap-2">
+            <div className="text-xs text-purple-300 font-medium flex items-center gap-1">
+              <UserPlus className="h-3 w-3 text-purple-400" /> Premium Follow Features Allocation System:
+            </div>
+            <div className="flex gap-2 w-full sm:w-auto justify-end">
+              <button 
+                onClick={followViaRecharge} 
+                disabled={loadingFollow}
+                className="bg-gold hover:bg-gold/80 text-ink text-xs font-bold px-2 py-1.5 rounded transition disabled:opacity-50"
+              >
+                {loadingFollow ? "Processing..." : "₹20 Recharge"}
+              </button>
+              <button 
+                onClick={() => setIsAdPopupOpen(true)}
+                className="bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold px-2 py-1.5 rounded transition"
+              >
+                📺 Watch 3 Ads (Follow)
+              </button>
+            </div>
           </div>
-          <div className="flex gap-2 w-full sm:w-auto justify-end">
-            <button 
-              onClick={followViaRecharge} 
-              disabled={loadingFollow}
-              className="bg-gold hover:bg-gold/80 text-ink text-xs font-bold px-2 py-1.5 rounded transition disabled:opacity-50"
-            >
-              {loadingFollow ? "Processing..." : "₹20 Recharge"}
-            </button>
-            <button 
-              onClick={() => setIsAdPopupOpen(true)}
-              className="bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold px-2 py-1.5 rounded transition"
-            >
-              📺 Watch 3 Ads (Follow)
-            </button>
-          </div>
-        </div>
+        )}
 
         {roomNotice ? <p className="mt-2 rounded-lg border border-line bg-panel p-2 text-xs text-yellow-400 font-medium">{roomNotice}</p> : null}
       </header>
