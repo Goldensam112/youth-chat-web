@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
-import { Clock3, Flag, MessageSquareDashed, Send, Shield, Sparkles, TimerReset, X, Zap, UserPlus } from "lucide-react";
+import { Clock3, Flag, MessageSquareDashed, Send, Shield, Sparkles, TimerReset, X, Zap, UserPlus, MoreVertical, Ban, Check, UserCheck } from "lucide-react";
 import { api } from "@/lib/api";
 import { getSocket } from "@/lib/socket";
 import type { Message, Room } from "@/lib/types";
@@ -21,9 +21,26 @@ export function ChatViewport({ mobile = false }: { mobile?: boolean }) {
   
   const [isAdPopupOpen, setIsAdPopupOpen] = useState(false);
   const [loadingFollow, setLoadingFollow] = useState(false);
+  
+  // Instagram Style Extra States
+  const [showMenu, setShowMenu] = useState(false);
+  const [followStatus, setFollowStatus] = useState<{ isFollowing: boolean; isMutual: boolean }>({ isFollowing: false, isMutual: false });
+  const [opponentDetails, setOpponentDetails] = useState<{ name: string; gender: string } | null>(null);
 
   const listRef = useRef<HTMLDivElement | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
   const roomId = room?._id;
+
+  // Bahar click karne par 3-dot menu band ho jaye
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setShowMenu(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   useEffect(() => {
     if (!roomId) return;
@@ -33,6 +50,29 @@ export function ChatViewport({ mobile = false }: { mobile?: boolean }) {
       setTimeLeft(res.timeLeft);
     });
   }, [roomId, setMessages, setRoom, setTimeLeft]);
+
+  // Samne wale ki details pull karna (Name, Gender aur Connection status ke liye)
+  useEffect(() => {
+    if (!room || !user) return;
+    const targetUserId = room.participants.find(p => p !== user?._id);
+    if (!targetUserId) return;
+
+    // Backend se check karte hain uski real details
+    api<{ success: boolean; user?: { name: string; gender: string }; isFollowing?: boolean; isMutual?: boolean }>(`/api/profile/user/${targetUserId}`).then((res) => {
+      if (res.user) {
+        setOpponentDetails({
+          name: res.user.name || "Stranger",
+          gender: res.user.gender || "unknown"
+        });
+      }
+      setFollowStatus({
+        isFollowing: res.isFollowing || false,
+        isMutual: res.isMutual || false
+      });
+    }).catch(() => {
+      setOpponentDetails({ name: "Chat Partner", gender: "unknown" });
+    });
+  }, [room, user]);
 
   useEffect(() => {
     if (!roomId) return;
@@ -48,7 +88,6 @@ export function ChatViewport({ mobile = false }: { mobile?: boolean }) {
 
     const handleMessage = ({ message }: { message: Message }) => addMessage(message);
     const handleTimer = ({ roomId: eventRoomId, timeLeft: nextTimeLeft }: { roomId: string; timeLeft: number }) => {
-      // ⚡ YAHAN CHANGED: Agar backend user se dynamic billing kar raha hai, toh usi time ko stream hone do
       if (eventRoomId === roomId) setTimeLeft(nextTimeLeft);
     };
     const handleLock = ({ roomId: eventRoomId }: { roomId: string }) => {
@@ -58,12 +97,8 @@ export function ChatViewport({ mobile = false }: { mobile?: boolean }) {
     const handleTyping = ({ userId, isTyping }: { userId: string; isTyping: boolean }) => {
       setTypingUser(isTyping ? userId : null);
     };
-
-    // ⚡ Realtime Billing Listener (Credits updates handle karne ke liye)
     const handleBalanceUpdated = (data: { credits: number }) => {
-      if (user) {
-        setUser({ ...user, credits: data.credits });
-      }
+      if (user) setUser({ ...user, credits: data.credits });
     };
 
     socket.on("message:new", handleMessage);
@@ -86,7 +121,6 @@ export function ChatViewport({ mobile = false }: { mobile?: boolean }) {
   }, [messages.length]);
 
   const displayTimer = useMemo(() => {
-    // ⚡ YAHAN CHANGED: Unlimited window sirf display ke liye 999999 target karegi par backend calculation logic transparent rahega
     if (timeLeft > 9999) return "♾️ UNLOCKED"; 
     const minutes = Math.floor(timeLeft / 60).toString().padStart(2, "0");
     const seconds = (timeLeft % 60).toString().padStart(2, "0");
@@ -119,21 +153,43 @@ export function ChatViewport({ mobile = false }: { mobile?: boolean }) {
     getSocket()?.emit("typing", { roomId: room._id, isTyping: value.length > 0 });
   }
 
-  // 🛠️ FIX: Sahi endpoints routing structure lagaya taaki "Something went wrong" hat jaye
-  async function followViaRecharge() {
-    if (!room) return;
+  // Instagram Follow / Follow Back Logic Handler
+  async function toggleFollowAction() {
+    if (!room || !user) return;
     setLoadingFollow(true);
     try {
       const targetUserId = room.participants.find(p => p !== user?._id);
-      
+      const res = await api<{ success: boolean; isFollowing: boolean; isMutual: boolean; message?: string }>(`/api/profile/user/${targetUserId}/follow`, {
+        method: "POST"
+      });
+
+      if (res.success) {
+        setFollowStatus({ isFollowing: res.isFollowing, isMutual: res.isMutual });
+        setRoomNotice(res.message || "Action updated successfully!");
+      } else {
+        setRoomNotice(res.message || "Failed to update connection status.");
+      }
+    } catch (err) {
+      setRoomNotice("Error executing connection shift.");
+    } finally {
+      setLoadingFollow(false);
+    }
+  }
+
+  async function followViaRecharge() {
+    if (!room || !user) return;
+    setLoadingFollow(true);
+    try {
+      const targetUserId = room.participants.find(p => p !== user?._id);
       const res = await api<{ success: boolean; message?: string }>(`/api/profile/user/${targetUserId}/follow`, {
         method: "POST"
       });
 
       if (res.success) {
         setRoomNotice("Mubarak ho! Connection successfully joda gaya 🎉");
+        setFollowStatus({ isFollowing: true, isMutual: followStatus.isMutual });
         useChatStore.setState((state) => (state.room ? { room: { ...state.room, status: "active" } } : state));
-        setTimeLeft(60); // ⚡ YAHAN CHANGED: Timer reset kiya taaki billing algorithm seamlessly listen kare
+        setTimeLeft(60);
       } else {
         setRoomNotice(res.message || "Recharge balance kam hai bhai!");
       }
@@ -144,24 +200,44 @@ export function ChatViewport({ mobile = false }: { mobile?: boolean }) {
     }
   }
 
-  // 🛠️ FIX: Ads success event par actual backend follow data create karna
   async function handleAdsSuccess() {
     setIsAdPopupOpen(false);
-    if (!room) return;
+    if (!room || !user) return;
     try {
       const targetUserId = room.participants.find(p => p !== user?._id);
-      
       const res = await api<{ success: boolean }>(`/api/profile/user/${targetUserId}/follow`, {
         method: "POST"
       });
 
       if (res.success) {
-        setRoomNotice("Mubarak ho! 3 Ads complete hue. User connections mein save ho gaya hai!");
+        setRoomNotice("Mubarak ho! 3 Ads complete hue. Connected!");
+        setFollowStatus({ isFollowing: true, isMutual: followStatus.isMutual });
         useChatStore.setState((state) => (state.room ? { room: { ...state.room, status: "active" } } : state));
-        setTimeLeft(60); // ⚡ YAHAN CHANGED: Timer ko current billing loop se jod diya
+        setTimeLeft(60);
       }
     } catch (err) {
       setRoomNotice("Something went wrong with connection activation!");
+    }
+  }
+
+  // Instagram Style Block Action
+  async function triggerBlockUser() {
+    if (!room || !user) return;
+    setShowMenu(false);
+    if (!confirm("Kya aap sach me is user ko block karna chahte hain?")) return;
+    
+    try {
+      const targetUserId = room.participants.find(p => p !== user?._id);
+      const res = await api<{ success: boolean; message?: string }>(`/api/profile/user/${targetUserId}/block`, {
+        method: "POST"
+      });
+
+      if (res.success) {
+        alert("User ko block kar diya gaya hai.");
+        closeRoom(); // Chat close kar do block karte hi
+      }
+    } catch (err) {
+      setRoomNotice("Block operation failed.");
     }
   }
 
@@ -172,6 +248,7 @@ export function ChatViewport({ mobile = false }: { mobile?: boolean }) {
       body: JSON.stringify({ reason: "User reported from chat", details: "Quick report from live room UI." })
     });
     setRoomNotice("Report submitted for review.");
+    setShowMenu(false);
   }
 
   async function closeRoom() {
@@ -218,22 +295,103 @@ export function ChatViewport({ mobile = false }: { mobile?: boolean }) {
 
   return (
     <section className={`relative grid grid-rows-[auto_1fr_auto] overflow-hidden rounded-lg border border-line bg-panel ${mobile ? "h-[calc(100svh-8.5rem)]" : "min-h-[calc(100svh-2rem)]"}`}>
-      <header className="border-b border-line bg-ink/50 p-3 sm:p-4">
+      
+      {/* 📸 Upgraded Instagram Style Header */}
+      <header className="border-b border-line bg-ink/50 p-3 sm:p-4 relative">
         <div className="flex items-center justify-between gap-3">
-          <div className="min-w-0">
-            <p className="text-xs uppercase tracking-[0.18em] text-white/42">Live room</p>
-            <h2 className="truncate font-bold">{room.sharedInterests.length ? room.sharedInterests.join(", ") : "Fresh match"}</h2>
+          <div className="min-w-0 flex items-center gap-2">
+            <div>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {/* 🌟 Dynamic Username display */}
+                <h2 className="font-bold text-base truncate max-w-[120px] sm:max-w-[200px]">
+                  {opponentDetails?.name || "Stranger"}
+                </h2>
+                
+                {/* 🔴/🔵 Instagram Style Gender Badge */}
+                {opponentDetails?.gender === "female" && (
+                  <span className="bg-rose-500/20 text-rose-400 border border-rose-500/30 text-[10px] px-1.5 py-0.5 rounded-full font-bold flex items-center">
+                    🔴 Girl
+                  </span>
+                )}
+                {opponentDetails?.gender === "male" && (
+                  <span className="bg-sky-500/20 text-sky-400 border border-sky-500/30 text-[10px] px-1.5 py-0.5 rounded-full font-bold flex items-center">
+                    🔵 Boy
+                  </span>
+                )}
+              </div>
+              <p className="text-[11px] text-white/42 truncate mt-0.5">
+                {room.sharedInterests.length ? `Interests: ${room.sharedInterests.join(", ")}` : "Live Connected Match"}
+              </p>
+            </div>
+
+            {/* ➕ Instagram Style Follow/FollowBack/Friends Dynamic Action Button */}
+            <button
+              onClick={toggleFollowAction}
+              disabled={loadingFollow}
+              className={`ml-2 text-xs font-bold px-3 py-1 rounded-full transition duration-200 flex items-center gap-1 shrink-0 ${
+                followStatus.isMutual 
+                  ? "bg-white/10 text-white hover:bg-white/20" 
+                  : followStatus.isFollowing 
+                    ? "bg-zinc-700 text-zinc-300 hover:bg-zinc-600"
+                    : "bg-blue-600 text-white hover:bg-blue-500"
+              }`}
+            >
+              {followStatus.isMutual ? (
+                <>
+                  <UserCheck className="h-3 w-3" /> Friends
+                </>
+              ) : followStatus.isFollowing ? (
+                "Following"
+              ) : "Follow"}
+            </button>
           </div>
-          <div className={`inline-flex h-10 items-center gap-2 rounded-lg px-3 text-sm font-bold ${timeLeft < 10 ? "bg-coral text-white" : "bg-mint text-ink"}`}>
-            <Clock3 className="h-4 w-4" />
-            {displayTimer}
+
+          <div className="flex items-center gap-2 shrink-0">
+            {/* ⏱️ Dynamic Server Clock Display */}
+            <div className={`inline-flex h-9 items-center gap-1.5 rounded-lg px-2.5 text-xs font-bold ${timeLeft < 10 ? "bg-coral text-white" : "bg-mint text-ink"}`}>
+              <Clock3 className="h-3.5 w-3.5" />
+              {displayTimer}
+            </div>
+
+            {/* 3-Dots Dropdown Options Controller Menu */}
+            <div className="relative" ref={menuRef}>
+              <button 
+                onClick={() => setShowMenu(!showMenu)}
+                className="grid h-9 w-9 place-items-center rounded-lg border border-line bg-panel text-white/65 hover:text-white"
+              >
+                <MoreVertical className="h-4 w-4" />
+              </button>
+
+              {showMenu && (
+                <div className="absolute right-0 mt-2 w-40 bg-zinc-900 border border-line rounded-lg shadow-xl py-1 z-50 text-sm">
+                  <button 
+                    onClick={triggerBlockUser}
+                    className="w-full text-left px-3 py-2 text-red-400 hover:bg-white/5 font-medium flex items-center gap-2"
+                  >
+                    <Ban className="h-3.5 w-3.5" /> Block User
+                  </button>
+                  <button 
+                    onClick={reportRoom}
+                    className="w-full text-left px-3 py-2 text-white/80 hover:bg-white/5 flex items-center gap-2"
+                  >
+                    <Flag className="h-3.5 w-3.5" /> Report Room
+                  </button>
+                  <button 
+                    onClick={closeRoom}
+                    className="w-full text-left px-3 py-2 text-white/60 hover:bg-white/5 border-t border-white/5 flex items-center gap-2"
+                  >
+                    <X className="h-3.5 w-3.5" /> Close Chat
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
         
         {timeLeft < 9999 && (
           <div className="mt-3 p-2 bg-purple-950/40 border border-purple-500/30 rounded-lg flex flex-wrap items-center justify-between gap-2">
             <div className="text-xs text-purple-300 font-medium flex items-center gap-1">
-              <UserPlus className="h-3 w-3 text-purple-400" /> Is Person se hamesha ke liye chat unlock karein:
+              <UserPlus className="h-3 w-3 text-purple-400" /> Premium features allocation unlock logic:
             </div>
             <div className="flex gap-2 w-full sm:w-auto justify-end">
               <button 
@@ -247,26 +405,12 @@ export function ChatViewport({ mobile = false }: { mobile?: boolean }) {
                 onClick={() => setIsAdPopupOpen(true)}
                 className="bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold px-2 py-1.5 rounded transition"
               >
-                📺 Watch 3 Ads (Free)
+                Intact Ads Wallet System
               </button>
             </div>
           </div>
         )}
 
-        <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-          <div className="min-w-0 flex-1 items-center gap-2 text-xs text-white/55 sm:flex">
-            <Shield className="h-4 w-4 text-gold" />
-            <span className="line-clamp-2">{room.status === "active" ? "Messages are live." : "Room is locked until credits are used."}</span>
-          </div>
-          <div className="flex gap-2">
-            <button className="grid h-8 w-8 place-items-center rounded-lg border border-line bg-panel text-white/65 hover:text-white" onClick={reportRoom} title="Report">
-              <Flag className="h-4 w-4" />
-            </button>
-            <button className="grid h-8 w-8 place-items-center rounded-lg border border-line bg-panel text-white/65 hover:text-white" onClick={closeRoom} title="Close room">
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-        </div>
         {roomNotice ? <p className="mt-2 rounded-lg border border-line bg-panel p-2 text-xs text-yellow-400 font-medium">{roomNotice}</p> : null}
       </header>
       
