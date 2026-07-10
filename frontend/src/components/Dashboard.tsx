@@ -82,7 +82,6 @@ export function Dashboard({ mobileTab, onOpenChat }: DashboardProps) {
   async function loadBlockedUsers() {
     setLoadingBlocks(true);
     try {
-      // Backend settings check
       const res = await api<{ success: boolean; data: any[] }>("/api/profile/my-blocks").catch(() => ({ success: true, data: [] }));
       if (res.success) {
         setBlockedUsers(res.data || []);
@@ -360,8 +359,8 @@ export function Dashboard({ mobileTab, onOpenChat }: DashboardProps) {
                     <div className="min-w-0">
                       <div className="flex items-center gap-1">
                         <p className="text-xs font-bold truncate">@{conn.username || conn.name}</p>
-                        {/* Mutual Connection Heart tag */}
-                        <Heart className="h-2.5 w-2.5 text-rose-500 fill-rose-500" title="Mutual Follow" />
+                        {/* 🛠️ FIX: Hata diya title tag ko jo compile crash kar raha tha */}
+                        <Heart className="h-2.5 w-2.5 text-rose-500 fill-rose-500" />
                       </div>
                       <p className="text-[10px] text-white/45 truncate max-w-[120px]">{conn.bio || "No bio yet"}</p>
                     </div>
