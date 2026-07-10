@@ -32,20 +32,43 @@ router.patch("/", requireAuth, async (req, res, next) => {
   }
 });
 
-// ➕ INSTAGRAM STYLE PAID/AD EXCLUSIVE CONTROLLER ROUTE
+// ⚡ Dynamic Single User Status API Fetching for Chat Screen
+router.get("/user/:id", requireAuth, async (req, res, next) => {
+  try {
+    const myId = String(req.user!._id);
+    const targetId = String(req.params.id);
+
+    const targetUser = await User.findById(targetId).select("name gender bio profilePictures").lean();
+    if (!targetUser) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    const followRecord = await Follow.findOne({ followerId: myId, followingId: targetId });
+
+    res.json({
+      success: true,
+      user: targetUser,
+      isFollowing: !!followRecord,
+      isMutual: followRecord ? followRecord.isMutual : false
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ➕ INSTAGRAM STYLE PAID/AD EXCLUSIVE CONTROLLER ROUTE (CRASH FIXED!)
 router.post("/user/:id/follow", requireAuth, async (req, res, next) => {
   try {
     const followerId = String(req.user!._id); 
     const followingId = String(req.params.id); 
     
-    // ⚡ FIX: Express compatibility parse standard for body reading
-    let bodyData = req.body;
+    let bodyData = req.body || {};
     if (typeof bodyData === 'string') {
       try { bodyData = JSON.parse(bodyData); } catch(e) {}
     }
 
-    const viaAd = bodyData?.viaAd || req.query?.viaAd === 'true';
-    const viaRecharge = bodyData?.viaRecharge || req.query?.viaRecharge === 'true';
+    const viaAd = bodyData.viaAd || req.query.viaAd === 'true';
+    const viaRecharge = bodyData.viaRecharge || req.query.viaRecharge === 'true';
 
     if (followerId === followingId) {
       return res.status(400).json({ success: false, message: "Aap khud ko connection mein add nahi kar sakte!" });
@@ -65,11 +88,12 @@ router.post("/user/:id/follow", requireAuth, async (req, res, next) => {
     const existingFollow = await Follow.findOne({ followerId, followingId });
 
     if (existingFollow) {
+      // 🔓 UNFOLLOW IS ALWAYS FREE: Isme viaAd / viaRecharge ki zaroorat nahi hai!
       await Follow.deleteOne({ _id: existingFollow._id });
       await Follow.updateOne({ followerId: followingId, followingId: followerId }, { isMutual: false });
       return res.json({ success: true, isFollowing: false, isMutual: false, message: "Connection se hataya gaya" });
     } else {
-      // ⚡ STRICT ACTION CHECK: Free click security filter
+      // 🔒 NAYA FOLLOW FREE MEI BLOCK HAI: Yahan check lagna chahiye
       if (!viaAd && !viaRecharge) {
         return res.status(403).json({ 
           success: false, 
@@ -86,7 +110,6 @@ router.post("/user/:id/follow", requireAuth, async (req, res, next) => {
         await Follow.updateOne({ followerId: followingId, followingId: followerId }, { isMutual: true });
       }
 
-      // ⚡ Return structured followStatus properties to frontend directly
       return res.json({ 
         success: true, 
         isFollowing: true, 
