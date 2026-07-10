@@ -11,8 +11,19 @@ export function setToken(token: string) {
 
 export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   const token = getToken();
-  const res = await fetch(`${API_URL}${path}`, {
+  
+  // ⚡ FIX: Agar body object format me hai toh use stringify kar do automatically
+  let requestBody = init.body;
+  if (requestBody && typeof requestBody === "object" && !(requestBody instanceof String)) {
+    requestBody = JSON.stringify(requestBody);
+  }
+
+  // ⚡ FIX: URL ke aage automated '/api' add kar rahe hain taaki route match ho sake
+  const finalUrl = `${API_URL}/api${path}`;
+
+  const res = await fetch(finalUrl, {
     ...init,
+    body: requestBody,
     headers: {
       "Content-Type": "application/json",
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
