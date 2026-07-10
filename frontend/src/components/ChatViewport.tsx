@@ -121,7 +121,6 @@ export function ChatViewport({ mobile = false }: { mobile?: boolean }) {
   }, [messages.length]);
 
   const displayTimer = useMemo(() => {
-    if (timeLeft > 9999) return "♾️ UNLOCKED"; 
     const minutes = Math.floor(timeLeft / 60).toString().padStart(2, "0");
     const seconds = (timeLeft % 60).toString().padStart(2, "0");
     return `${minutes}:${seconds}`;
@@ -181,13 +180,14 @@ export function ChatViewport({ mobile = false }: { mobile?: boolean }) {
     setLoadingFollow(true);
     try {
       const targetUserId = room.participants.find(p => p !== user?._id);
-      const res = await api<{ success: boolean; message?: string }>(`/api/profile/user/${targetUserId}/follow`, {
-        method: "POST"
+      const res = await api<{ success: boolean; isFollowing: boolean; isMutual: boolean; message?: string }>(`/api/profile/user/${targetUserId}/follow`, {
+        method: "POST",
+        body: JSON.stringify({ viaRecharge: true }) // Backend validation verified pack parameters trigger
       });
 
       if (res.success) {
         setRoomNotice("Mubarak ho! Connection successfully joda gaya 🎉");
-        setFollowStatus({ isFollowing: true, isMutual: followStatus.isMutual });
+        setFollowStatus({ isFollowing: res.isFollowing, isMutual: res.isMutual });
         useChatStore.setState((state) => (state.room ? { room: { ...state.room, status: "active" } } : state));
         setTimeLeft(60);
       } else {
@@ -205,13 +205,14 @@ export function ChatViewport({ mobile = false }: { mobile?: boolean }) {
     if (!room || !user) return;
     try {
       const targetUserId = room.participants.find(p => p !== user?._id);
-      const res = await api<{ success: boolean }>(`/api/profile/user/${targetUserId}/follow`, {
-        method: "POST"
+      const res = await api<{ success: boolean; isFollowing: boolean; isMutual: boolean }>(`/api/profile/user/${targetUserId}/follow`, {
+        method: "POST",
+        body: JSON.stringify({ viaAd: true }) // Backend validation verified ad parameters trigger
       });
 
       if (res.success) {
         setRoomNotice("Mubarak ho! 3 Ads complete hue. Connected!");
-        setFollowStatus({ isFollowing: true, isMutual: followStatus.isMutual });
+        setFollowStatus({ isFollowing: res.isFollowing, isMutual: res.isMutual });
         useChatStore.setState((state) => (state.room ? { room: { ...state.room, status: "active" } } : state));
         setTimeLeft(60);
       }
@@ -324,26 +325,26 @@ export function ChatViewport({ mobile = false }: { mobile?: boolean }) {
               </p>
             </div>
 
-           {/* ➕ Instagram Style Paid/Ad-based Follow Button */}
-<button
-  onClick={() => {
-    if (followStatus.isMutual || followStatus.isFollowing) {
-      // Agar pehle se followed hai toh unfollow free ho sakta hai
-      toggleFollowAction();
-    } else {
-      // Agar naya follow karna hai toh free me nahi hoga, notice dikhao ki niche diye options use karein
-      setRoomNotice("Bhai, free me follow nahi hoga! Niche diye ₹20 Recharge ya Watch Ads option ka use karein.");
-    }
-  }}
-  disabled={loadingFollow}
-  className={`ml-2 text-xs font-bold px-3 py-1 rounded-full transition duration-200 flex items-center gap-1 shrink-0 ${
-    followStatus.isMutual 
-      ? "bg-white/10 text-white hover:bg-white/20" 
-      : followStatus.isFollowing 
-        ? "bg-zinc-700 text-zinc-300 hover:bg-zinc-600"
-        : "bg-blue-600 text-white hover:bg-blue-500"
-  }`}
->
+            {/* ➕ Instagram Style Paid/Ad-based Follow Button */}
+            <button
+              onClick={() => {
+                if (followStatus.isMutual || followStatus.isFollowing) {
+                  // Pehle se followed hai toh unfollow free ho sakta hai
+                  toggleFollowAction();
+                } else {
+                  // Naya follow free me block hai, warning display state trigger
+                  setRoomNotice("Bhai, free me follow nahi hoga! Niche diye ₹20 Recharge ya Watch Ads option ka use korein.");
+                }
+              }}
+              disabled={loadingFollow}
+              className={`ml-2 text-xs font-bold px-3 py-1 rounded-full transition duration-200 flex items-center gap-1 shrink-0 ${
+                followStatus.isMutual 
+                  ? "bg-white/10 text-white hover:bg-white/20" 
+                  : followStatus.isFollowing 
+                    ? "bg-zinc-700 text-zinc-300 hover:bg-zinc-600"
+                    : "bg-blue-600 text-white hover:bg-blue-500"
+              }`}
+            >
               {followStatus.isMutual ? (
                 <>
                   <UserCheck className="h-3 w-3" /> Friends
@@ -396,28 +397,26 @@ export function ChatViewport({ mobile = false }: { mobile?: boolean }) {
           </div>
         </div>
         
-        {timeLeft < 9999 && (
-          <div className="mt-3 p-2 bg-purple-950/40 border border-purple-500/30 rounded-lg flex flex-wrap items-center justify-between gap-2">
-            <div className="text-xs text-purple-300 font-medium flex items-center gap-1">
-              <UserPlus className="h-3 w-3 text-purple-400" /> Premium features allocation unlock logic:
-            </div>
-            <div className="flex gap-2 w-full sm:w-auto justify-end">
-              <button 
-                onClick={followViaRecharge} 
-                disabled={loadingFollow}
-                className="bg-gold hover:bg-gold/80 text-ink text-xs font-bold px-2 py-1.5 rounded transition disabled:opacity-50"
-              >
-                {loadingFollow ? "Processing..." : "₹20 Recharge"}
-              </button>
-              <button 
-                onClick={() => setIsAdPopupOpen(true)}
-                className="bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold px-2 py-1.5 rounded transition"
-              >
-                Intact Ads Wallet System
-              </button>
-            </div>
+        <div className="mt-3 p-2 bg-purple-950/40 border border-purple-500/30 rounded-lg flex flex-wrap items-center justify-between gap-2">
+          <div className="text-xs text-purple-300 font-medium flex items-center gap-1">
+            <UserPlus className="h-3 w-3 text-purple-400" /> Premium Follow Features Allocation System:
           </div>
-        )}
+          <div className="flex gap-2 w-full sm:w-auto justify-end">
+            <button 
+              onClick={followViaRecharge} 
+              disabled={loadingFollow}
+              className="bg-gold hover:bg-gold/80 text-ink text-xs font-bold px-2 py-1.5 rounded transition disabled:opacity-50"
+            >
+              {loadingFollow ? "Processing..." : "₹20 Recharge"}
+            </button>
+            <button 
+              onClick={() => setIsAdPopupOpen(true)}
+              className="bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold px-2 py-1.5 rounded transition"
+            >
+              📺 Watch 3 Ads (Follow)
+            </button>
+          </div>
+        </div>
 
         {roomNotice ? <p className="mt-2 rounded-lg border border-line bg-panel p-2 text-xs text-yellow-400 font-medium">{roomNotice}</p> : null}
       </header>
