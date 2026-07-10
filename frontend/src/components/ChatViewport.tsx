@@ -31,7 +31,6 @@ export function ChatViewport({ mobile = false }: { mobile?: boolean }) {
   const menuRef = useRef<HTMLDivElement | null>(null);
   const roomId = room?._id;
 
-  // Bahar click karne par 3-dot menu band ho jaye
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
@@ -51,7 +50,6 @@ export function ChatViewport({ mobile = false }: { mobile?: boolean }) {
     });
   }, [roomId, setMessages, setRoom, setTimeLeft]);
 
-  // Samne wale ki details pull karna (Name, Gender aur Connection status ke liye)
   useEffect(() => {
     if (!room || !user) return;
     const targetUserId = room.participants.find(p => p !== user?._id);
@@ -151,7 +149,6 @@ export function ChatViewport({ mobile = false }: { mobile?: boolean }) {
     getSocket()?.emit("typing", { roomId: room._id, isTyping: value.length > 0 });
   }
 
-  // Instagram Follow / Follow Back Logic Handler
   async function toggleFollowAction() {
     if (!room || !user) return;
     setLoadingFollow(true);
@@ -174,7 +171,7 @@ export function ChatViewport({ mobile = false }: { mobile?: boolean }) {
     }
   }
 
-  // 🛠️ FIX: Added headers content-type metadata mapping
+  // ⚡ FIX: Dono tools me absolute body data structural passing format diya hai
   async function followViaRecharge() {
     if (!room || !user) return;
     setLoadingFollow(true);
@@ -182,9 +179,8 @@ export function ChatViewport({ mobile = false }: { mobile?: boolean }) {
       const targetUserId = room.participants.find(p => p !== user?._id);
       const res = await api<{ success: boolean; isFollowing: boolean; isMutual: boolean; message?: string }>(`/profile/user/${targetUserId}/follow`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ viaRecharge: true }) 
-      });
+        body: { viaRecharge: true }
+      } as any);
 
       if (res.success) {
         setRoomNotice("Mubarak ho! Connection successfully joda gaya 🎉");
@@ -201,7 +197,6 @@ export function ChatViewport({ mobile = false }: { mobile?: boolean }) {
     }
   }
 
-  // 🛠️ FIX: Added headers content-type metadata mapping
   async function handleAdsSuccess() {
     setIsAdPopupOpen(false);
     if (!room || !user) return;
@@ -209,9 +204,8 @@ export function ChatViewport({ mobile = false }: { mobile?: boolean }) {
       const targetUserId = room.participants.find(p => p !== user?._id);
       const res = await api<{ success: boolean; isFollowing: boolean; isMutual: boolean }>(`/profile/user/${targetUserId}/follow`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ viaAd: true }) 
-      });
+        body: { viaAd: true }
+      } as any);
 
       if (res.success) {
         setRoomNotice("Mubarak ho! 3 Ads complete hue. Connected!");
@@ -224,7 +218,6 @@ export function ChatViewport({ mobile = false }: { mobile?: boolean }) {
     }
   }
 
-  // Instagram Style Block Action
   async function triggerBlockUser() {
     if (!room || !user) return;
     setShowMenu(false);
@@ -249,8 +242,8 @@ export function ChatViewport({ mobile = false }: { mobile?: boolean }) {
     if (!room) return;
     await api(`/rooms/${room._id}/report`, {
       method: "POST",
-      body: JSON.stringify({ reason: "User reported from chat", details: "Quick report from live room UI." })
-    });
+      body: { reason: "User reported from chat", details: "Quick report from live room UI." }
+    } as any);
     setRoomNotice("Report submitted for review.");
     setShowMenu(false);
   }
