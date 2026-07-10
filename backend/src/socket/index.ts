@@ -8,7 +8,8 @@ import { Follow } from "../models/Follow.js";
 import { setSocketServer } from "./notifier.js";
 import { getRoomTimeLeft, isRoomExpired } from "../utils/timer.js";
 
-// 🔄 Har user ke billing interval timers track karne ke liye registry
+// 🔄 Har active room ke 60-second structural dynamic billing countdown tracker maps
+const roomCountdownRegistry = new Map<string, number>();
 const userBillingTimers = new Map();
 
 type SocketUser = {
@@ -22,9 +23,8 @@ declare module "socket.io" {
   }
 }
 
-// 🔥 NAYA UTILITY FUNCTION: Har 1 minute par credit deduct karne wala loop
+// 🔥 UPGRADED UTILITY: Har 1 minute par 10 credit deduct karne wala engine
 function startUserBilling(io: Server, socket: any, userId: string, roomId: string) {
-  // Purana koi timer chal raha ho is user ka to pehle clean karein
   if (userBillingTimers.has(userId)) {
     clearInterval(userBillingTimers.get(userId));
   }
@@ -33,12 +33,10 @@ function startUserBilling(io: Server, socket: any, userId: string, roomId: strin
     try {
       const user = await User.findById(userId);
 
-      // 1. Check karo credits bache hain ya nahi (Minimum 1 chahiye)
-      if (!user || user.credits < 1) {
-        // Room status lock update karo database me
+      // 1. Minimum 10 credits hona compulsory hai har minute chat extend karne ke liye
+      if (!user || user.credits < 10) {
         await Room.findByIdAndUpdate(roomId, { status: "locked" });
 
-        // Room ke sabhi users ko block page event trigger bhejo
         io.to(roomId).emit("room_lock", { 
           roomId, 
           lockedAt: new Date().toISOString(), 
@@ -47,27 +45,30 @@ function startUserBilling(io: Server, socket: any, userId: string, roomId: strin
 
         clearInterval(intervalId);
         userBillingTimers.delete(userId);
+        roomCountdownRegistry.delete(roomId);
         return;
       }
 
-      // 2. Credits deduct karo
-      user.credits -= 1;
+      // 2. Continuous session validation: Cuts exactly 10 credits per minute
+      user.credits -= 10;
       await user.save();
 
-      // 3. Frontend ko realtime automatic balance push karo (CreditPill handle ke liye)
+      // 3. Sync real-time balance metrics with client dashboard pills
       socket.emit("balance_updated", { credits: user.credits });
+
+      // 4. Reset checkout loop constraints: Reset room timer countdown array back to 60 seconds
+      roomCountdownRegistry.set(roomId, 60);
 
     } catch (err) {
       console.error("Billing logic loop integration failure:", err);
       clearInterval(intervalId);
       userBillingTimers.delete(userId);
     }
-  }, 60000); // Perfect 60000ms = 1 Minute
+  }, 60000); // Perfect 1 Minute interval tracker logic
 
   userBillingTimers.set(userId, intervalId);
 }
 
-// 🛑 Billing timer clear karne ka wrapper function
 function stopUserBilling(userId: string) {
   if (userBillingTimers.has(userId)) {
     clearInterval(userBillingTimers.get(userId));
@@ -75,7 +76,6 @@ function stopUserBilling(userId: string) {
   }
 }
 
-// --- ROOM EXPIRY CHECKER WITH FOLLOW BYPASS ---
 async function lockExpiredRoom(io: Server, roomId: string) {
   const room = await Room.findById(roomId);
   if (!room || room.status !== "active") return room;
@@ -88,6 +88,7 @@ async function lockExpiredRoom(io: Server, roomId: string) {
     ]
   });
 
+  // Agar paid follow context hai toh standard chronological expiration module bypass hoga
   if (hasFollowRelationship) {
     return room;
   }
@@ -152,12 +153,16 @@ export function registerSocketHandlers(io: Server) {
           await room.save();
         }
 
-        socket.join(room._id.toString());
+        const roomIdStr = room._id.toString();
+        socket.join(roomIdStr);
         
-        // ✅ Direct Chat chalu hote hi per-minute charging start kar do
-        startUserBilling(io, socket, userId, room._id.toString());
+        // Baseline alignment data for tracking: start from 60 seconds window limit
+        if (!roomCountdownRegistry.has(roomIdStr)) {
+          roomCountdownRegistry.set(roomIdStr, 60);
+        }
         
-        callback?.({ ok: true, roomId: room._id.toString() });
+        startUserBilling(io, socket, userId, roomIdStr);
+        callback?.({ ok: true, roomId: roomIdStr });
 
       } catch (error) {
         callback?.({ ok: false, message: "Server mein kuch dikkat aayi!" });
@@ -173,21 +178,32 @@ export function registerSocketHandlers(io: Server) {
 
       await lockExpiredRoom(io, roomId);
       const freshRoom = await Room.findById(roomId);
-      socket.join(roomId);
-      
-      // ✅ Jaise hi user room join karta hai (chahe direct ho ya match se), billing timer trigger ho jayega
-      if (freshRoom && freshRoom.status === "active") {
-        startUserBilling(io, socket, userId, roomId);
-      }
+      const roomIdStr = roomId.toString();
+      socket.join(roomIdStr);
       
       const [userA, userB] = room.participants;
       const hasFollow = await Follow.findOne({
         $or: [{ followerId: userA, followingId: userB }, { followerId: userB, followingId: userA }]
       });
 
+      if (freshRoom && freshRoom.status === "active") {
+        startUserBilling(io, socket, userId, roomIdStr);
+        // If follow logic is true, initialize premium dynamic 60s runtime check parameters
+        if (hasFollow && !roomCountdownRegistry.has(roomIdStr)) {
+          roomCountdownRegistry.set(roomIdStr, 60);
+        }
+      }
+      
+      let finalTimeLeft = 0;
+      if (hasFollow) {
+        finalTimeLeft = roomCountdownRegistry.get(roomIdStr) ?? 60;
+      } else if (freshRoom) {
+        finalTimeLeft = getRoomTimeLeft(freshRoom);
+      }
+
       callback?.({
         ok: true,
-        timeLeft: hasFollow ? 999999 : (freshRoom ? getRoomTimeLeft(freshRoom) : 0), 
+        timeLeft: finalTimeLeft, 
         status: freshRoom?.status,
         serverTime: new Date().toISOString()
       });
@@ -212,19 +228,18 @@ export function registerSocketHandlers(io: Server) {
       socket.to(roomId).emit("typing", { roomId, userId, isTyping: Boolean(isTyping) });
     });
 
-    // ✅ Room chorne ya tab browser back karne par us banda ka billing interval band karein
     socket.on("leave_room", () => {
       stopUserBilling(userId);
     });
 
     socket.on("disconnect", async () => {
-      stopUserBilling(userId); // Billing stop
+      stopUserBilling(userId); 
       await User.findByIdAndUpdate(userId, { isOnline: false, lastSeenAt: new Date() });
       socket.broadcast.emit("presence_update", { userId, isOnline: false });
     });
   });
 
-  // Timer loop for active rooms
+  // ⏱️ REAL-TIME EMITTER ENGINE LOOP: Updates tick down precisely every second
   setInterval(async () => {
     const rooms = await Room.find({ status: "active" }).limit(500);
     await Promise.all(
@@ -237,7 +252,16 @@ export function registerSocketHandlers(io: Server) {
         });
 
         if (hasFollow) {
-          io.to(roomId).emit("timer_update", { roomId, timeLeft: 999999, serverTime: new Date().toISOString() });
+          // ⚡ FIX: Static 999999 element drop. Ab dynamic decreasing logic execute hoga.
+          let currentSeconds = roomCountdownRegistry.get(roomId) ?? 60;
+          currentSeconds = Math.max(0, currentSeconds - 1);
+          roomCountdownRegistry.set(roomId, currentSeconds);
+
+          io.to(roomId).emit("timer_update", { 
+            roomId, 
+            timeLeft: currentSeconds, 
+            serverTime: new Date().toISOString() 
+          });
         } else {
           const timeLeft = getRoomTimeLeft(room);
           io.to(roomId).emit("timer_update", { roomId, timeLeft, serverTime: new Date().toISOString() });
