@@ -41,13 +41,24 @@ export function ChatViewport({ mobile = false }: { mobile?: boolean }) {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  // ⏱️ NAYA LIVE RUNNING TIMER SUB-LOOP EFFECT: Agar socket update delay ho, toh client khud time ghataye live ticking ke liye
+  useEffect(() => {
+    if (!roomId || room?.status !== "active" || timeLeft <= 0) return;
+    
+    const localTimer = setInterval(() => {
+      setTimeLeft(Math.max(0, timeLeft - 1));
+    }, 1000);
+
+    return () => clearInterval(localTimer);
+  }, [roomId, room?.status, timeLeft, setTimeLeft]);
+
   useEffect(() => {
     if (!roomId) return;
     api<{ room: Room; messages: Message[]; timeLeft: number }>(`/api/rooms/${roomId}`).then((res) => {
       setRoom(res.room);
       setMessages(res.messages);
       setTimeLeft(res.timeLeft);
-    });
+    }).catch((err) => console.error("Room sync query error", err));
   }, [roomId, setMessages, setRoom, setTimeLeft]);
 
   useEffect(() => {
@@ -85,7 +96,9 @@ export function ChatViewport({ mobile = false }: { mobile?: boolean }) {
 
     const handleMessage = ({ message }: { message: Message }) => addMessage(message);
     const handleTimer = ({ roomId: eventRoomId, timeLeft: nextTimeLeft }: { roomId: string; timeLeft: number }) => {
-      if (eventRoomId === roomId) setTimeLeft(nextTimeLeft);
+      if (eventRoomId === roomId) {
+        setTimeLeft(nextTimeLeft);
+      }
     };
     const handleLock = ({ roomId: eventRoomId }: { roomId: string }) => {
       if (eventRoomId !== roomId) return;
@@ -118,6 +131,7 @@ export function ChatViewport({ mobile = false }: { mobile?: boolean }) {
   }, [messages.length]);
 
   const displayTimer = useMemo(() => {
+    if (timeLeft <= 0) return "00:00";
     const minutes = Math.floor(timeLeft / 60).toString().padStart(2, "0");
     const seconds = (timeLeft % 60).toString().padStart(2, "0");
     return `${minutes}:${seconds}`;
@@ -171,7 +185,6 @@ export function ChatViewport({ mobile = false }: { mobile?: boolean }) {
     }
   }
 
-  // ⚡ FIX: Direct `/api/profile/...` aur standard body stringification
   async function followViaRecharge() {
     if (!room || !user) return;
     setLoadingFollow(true);
@@ -197,7 +210,6 @@ export function ChatViewport({ mobile = false }: { mobile?: boolean }) {
     }
   }
 
-  // ⚡ FIX: Direct `/api/profile/...` aur standard body stringification
   async function handleAdsSuccess() {
     setIsAdPopupOpen(false);
     if (!room || !user) return;
