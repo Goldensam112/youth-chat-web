@@ -43,7 +43,7 @@ export function ChatViewport({ mobile = false }: { mobile?: boolean }) {
 
   useEffect(() => {
     if (!roomId) return;
-    api<{ room: Room; messages: Message[]; timeLeft: number }>(`/rooms/${roomId}`).then((res) => {
+    api<{ room: Room; messages: Message[]; timeLeft: number }>(`/api/rooms/${roomId}`).then((res) => {
       setRoom(res.room);
       setMessages(res.messages);
       setTimeLeft(res.timeLeft);
@@ -55,7 +55,7 @@ export function ChatViewport({ mobile = false }: { mobile?: boolean }) {
     const targetUserId = room.participants.find(p => p !== user?._id);
     if (!targetUserId) return;
 
-    api<{ success: boolean; user?: { name: string; gender: string }; isFollowing?: boolean; isMutual?: boolean }>(`/profile/user/${targetUserId}`).then((res) => {
+    api<{ success: boolean; user?: { name: string; gender: string }; isFollowing?: boolean; isMutual?: boolean }>(`/api/profile/user/${targetUserId}`).then((res) => {
       if (res.user) {
         setOpponentDetails({
           name: res.user.name || "Stranger",
@@ -154,7 +154,7 @@ export function ChatViewport({ mobile = false }: { mobile?: boolean }) {
     setLoadingFollow(true);
     try {
       const targetUserId = room.participants.find(p => p !== user?._id);
-      const res = await api<{ success: boolean; isFollowing: boolean; isMutual: boolean; message?: string }>(`/profile/user/${targetUserId}/follow`, {
+      const res = await api<{ success: boolean; isFollowing: boolean; isMutual: boolean; message?: string }>(`/api/profile/user/${targetUserId}/follow`, {
         method: "POST"
       });
 
@@ -171,12 +171,13 @@ export function ChatViewport({ mobile = false }: { mobile?: boolean }) {
     }
   }
 
+  // ⚡ FIX: Direct `/api/profile/...` aur standard body stringification
   async function followViaRecharge() {
     if (!room || !user) return;
     setLoadingFollow(true);
     try {
       const targetUserId = room.participants.find(p => p !== user?._id);
-      const res = await api<{ success: boolean; isFollowing: boolean; isMutual: boolean; message?: string }>(`/profile/user/${targetUserId}/follow`, {
+      const res = await api<{ success: boolean; isFollowing: boolean; isMutual: boolean; message?: string }>(`/api/profile/user/${targetUserId}/follow`, {
         method: "POST",
         body: JSON.stringify({ viaRecharge: true })
       });
@@ -190,19 +191,19 @@ export function ChatViewport({ mobile = false }: { mobile?: boolean }) {
         setRoomNotice(res.message || "Recharge balance kam hai bhai!");
       }
     } catch (err) {
-      // ⚡ Clear generic text, display actual message now
       setRoomNotice(err instanceof Error ? err.message : "Action execution failure!");
     } finally {
       setLoadingFollow(false);
     }
   }
 
+  // ⚡ FIX: Direct `/api/profile/...` aur standard body stringification
   async function handleAdsSuccess() {
     setIsAdPopupOpen(false);
     if (!room || !user) return;
     try {
       const targetUserId = room.participants.find(p => p !== user?._id);
-      const res = await api<{ success: boolean; isFollowing: boolean; isMutual: boolean }>(`/profile/user/${targetUserId}/follow`, {
+      const res = await api<{ success: boolean; isFollowing: boolean; isMutual: boolean }>(`/api/profile/user/${targetUserId}/follow`, {
         method: "POST",
         body: JSON.stringify({ viaAd: true })
       });
@@ -225,7 +226,7 @@ export function ChatViewport({ mobile = false }: { mobile?: boolean }) {
     
     try {
       const targetUserId = room.participants.find(p => p !== user?._id);
-      const res = await api<{ success: boolean; message?: string }>(`/profile/user/${targetUserId}/block`, {
+      const res = await api<{ success: boolean; message?: string }>(`/api/profile/user/${targetUserId}/block`, {
         method: "POST"
       });
 
@@ -240,7 +241,7 @@ export function ChatViewport({ mobile = false }: { mobile?: boolean }) {
 
   async function reportRoom() {
     if (!room) return;
-    await api(`/rooms/${room._id}/report`, {
+    await api(`/api/rooms/${room._id}/report`, {
       method: "POST",
       body: JSON.stringify({ reason: "User reported from chat", details: "Quick report from live room UI." })
     });
@@ -250,7 +251,7 @@ export function ChatViewport({ mobile = false }: { mobile?: boolean }) {
 
   async function closeRoom() {
     if (!room) return;
-    await api(`/rooms/${room._id}/close`, { method: "POST" });
+    await api(`/api/rooms/${room._id}/close`, { method: "POST" });
     setRoom(null);
     setMessages([]);
     setRoomNotice("");
