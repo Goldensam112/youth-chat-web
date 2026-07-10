@@ -171,7 +171,6 @@ export function ChatViewport({ mobile = false }: { mobile?: boolean }) {
     }
   }
 
-  // ⚡ FIX: Dono tools me absolute body data structural passing format diya hai
   async function followViaRecharge() {
     if (!room || !user) return;
     setLoadingFollow(true);
@@ -179,8 +178,8 @@ export function ChatViewport({ mobile = false }: { mobile?: boolean }) {
       const targetUserId = room.participants.find(p => p !== user?._id);
       const res = await api<{ success: boolean; isFollowing: boolean; isMutual: boolean; message?: string }>(`/profile/user/${targetUserId}/follow`, {
         method: "POST",
-        body: { viaRecharge: true }
-      } as any);
+        body: JSON.stringify({ viaRecharge: true })
+      });
 
       if (res.success) {
         setRoomNotice("Mubarak ho! Connection successfully joda gaya 🎉");
@@ -191,7 +190,8 @@ export function ChatViewport({ mobile = false }: { mobile?: boolean }) {
         setRoomNotice(res.message || "Recharge balance kam hai bhai!");
       }
     } catch (err) {
-      setRoomNotice("Action execution failure!");
+      // ⚡ Clear generic text, display actual message now
+      setRoomNotice(err instanceof Error ? err.message : "Action execution failure!");
     } finally {
       setLoadingFollow(false);
     }
@@ -204,8 +204,8 @@ export function ChatViewport({ mobile = false }: { mobile?: boolean }) {
       const targetUserId = room.participants.find(p => p !== user?._id);
       const res = await api<{ success: boolean; isFollowing: boolean; isMutual: boolean }>(`/profile/user/${targetUserId}/follow`, {
         method: "POST",
-        body: { viaAd: true }
-      } as any);
+        body: JSON.stringify({ viaAd: true })
+      });
 
       if (res.success) {
         setRoomNotice("Mubarak ho! 3 Ads complete hue. Connected!");
@@ -214,7 +214,7 @@ export function ChatViewport({ mobile = false }: { mobile?: boolean }) {
         setTimeLeft(60);
       }
     } catch (err) {
-      setRoomNotice("Something went wrong with connection activation!");
+      setRoomNotice(err instanceof Error ? err.message : "Something went wrong with connection activation!");
     }
   }
 
@@ -242,8 +242,8 @@ export function ChatViewport({ mobile = false }: { mobile?: boolean }) {
     if (!room) return;
     await api(`/rooms/${room._id}/report`, {
       method: "POST",
-      body: { reason: "User reported from chat", details: "Quick report from live room UI." }
-    } as any);
+      body: JSON.stringify({ reason: "User reported from chat", details: "Quick report from live room UI." })
+    });
     setRoomNotice("Report submitted for review.");
     setShowMenu(false);
   }
