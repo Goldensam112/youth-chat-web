@@ -63,7 +63,6 @@ export function Dashboard({ mobileTab, onOpenChat }: DashboardProps) {
     return () => window.clearInterval(interval);
   }, [queueStatus, onOpenChat, setQueueStatus, setRoom, setTimeLeft]);
 
-  // 🛠️ Connections list fetch karne ke liye
   async function loadConnections() {
     setLoadingConnections(true);
     try {
@@ -78,7 +77,6 @@ export function Dashboard({ mobileTab, onOpenChat }: DashboardProps) {
     }
   }
 
-  // 🚫 Blocked users ki list mangwana
   async function loadBlockedUsers() {
     setLoadingBlocks(true);
     try {
@@ -93,7 +91,6 @@ export function Dashboard({ mobileTab, onOpenChat }: DashboardProps) {
     }
   }
 
-  // 🔓 User ko dashboard se directly unblock karna
   async function handleUnblock(targetId: string) {
     if (!confirm("क्या aap is user ko unblock karna chahte hain?")) return;
     try {
@@ -249,7 +246,6 @@ export function Dashboard({ mobileTab, onOpenChat }: DashboardProps) {
                   <h2 className="truncate text-xl font-bold">{user.name}</h2>
                   {user.gender === "female" && user.isFemaleVerified ? <UserRoundCheck className="h-4 w-4 text-mint" /> : null}
                   
-                  {/* 🔴/🔵 Self Instagram Gender Indicator Tag */}
                   {user.gender === "female" ? (
                     <span className="bg-rose-500/20 text-rose-400 border border-rose-500/20 text-[9px] px-1.5 py-0.2 rounded font-bold">Girl</span>
                   ) : (
@@ -308,28 +304,79 @@ export function Dashboard({ mobileTab, onOpenChat }: DashboardProps) {
 
       {showProfile ? <BannerAd /> : null}
 
-      {showDiscover ? <div className="rounded-lg border border-line bg-panel p-4 shadow-glow">
-        <div className="mb-4 flex items-start justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <Radar className="h-5 w-5 text-mint" />
-            <h3 className="font-semibold">Discovery Radar</h3>
+      {/* 📡 ELITE UPGRADED PREMIUM DISCOVERY RADAR CARD */}
+      {showDiscover ? (
+        <div className="rounded-xl border border-line bg-panel p-5 relative overflow-hidden shadow-[0_0_25px_rgba(83,230,177,0.15)] transition-all duration-300">
+          
+          {/* Animated Matrix Background glow when queued */}
+          {queueStatus === "queued" && (
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(83,230,177,0.12),transparent_65%)] animate-pulse pointer-events-none" />
+          )}
+
+          <div className="mb-6 flex items-start justify-between gap-3 relative z-10">
+            <div className="flex items-center gap-2">
+              <Radar className={`h-5 w-5 ${queueStatus === "queued" ? "text-mint animate-spin [animation-duration:4s]" : "text-mint"}`} />
+              <h3 className="font-bold tracking-wide text-white">Discovery Radar</h3>
+            </div>
+            <span className={`rounded-full px-2.5 py-0.5 text-xs font-bold transition-all ${queueStatus === "queued" ? "bg-gold text-ink animate-bounce" : room ? "bg-mint text-ink" : "bg-ink text-white/62"}`}>
+              {queueStatus === "queued" ? "Searching Vibe" : room ? "In Room" : "Idle"}
+            </span>
           </div>
-          <span className={`rounded-md px-2 py-1 text-xs font-semibold ${queueStatus === "queued" ? "bg-gold text-ink" : room ? "bg-mint text-ink" : "bg-ink text-white/62"}`}>
-            {queueStatus === "queued" ? "Searching" : room ? "In room" : "Idle"}
-          </span>
+
+          {/* 🔘 THE UI RADAR INTERACTIVE ANIMATION CONTAINER */}
+          <div className="flex flex-col items-center justify-center my-6 relative min-h-[160px] z-10">
+            {queueStatus === "queued" ? (
+              <div className="relative flex items-center justify-center w-full h-full">
+                {/* Radar Ripples Loop Wave Effects */}
+                <div className="absolute w-36 h-36 border border-mint/40 rounded-full animate-[ping_2s_infinite] opacity-75" />
+                <div className="absolute w-24 h-24 border border-mint/20 rounded-full animate-[ping_2.5s_infinite] delay-300 opacity-50" />
+                <div className="absolute w-16 h-16 border border-mint/10 rounded-full animate-[ping_3s_infinite] delay-700 opacity-25" />
+                
+                {/* Central Target Orb Widget */}
+                <div className="relative z-10 bg-gradient-to-tr from-mint to-teal-400 p-4 rounded-full shadow-[0_0_20px_rgba(83,230,177,0.6)] animate-pulse">
+                  <Compass className="h-7 w-7 text-ink animate-spin [animation-duration:8s]" />
+                </div>
+                
+                <p className="absolute bottom-[-24px] text-xs font-bold text-mint tracking-widest animate-pulse mt-4">
+                  LOOKING FOR MATCHING VIBE...
+                </p>
+              </div>
+            ) : (
+              <div className="text-center max-w-xs flex flex-col items-center">
+                <div className="bg-ink border border-line p-4 rounded-full mb-3 shadow-inner">
+                  <MessageCircle className="h-8 w-8 text-white/40" />
+                </div>
+                <p className="text-sm leading-relaxed text-white/62">
+                  Ready to launch! Press find below to lock connections with real active verified matching profiles.
+                </p>
+              </div>
+            )}
+          </div>
+
+          <div className="mt-8 relative z-10">
+            <Button 
+              className={`w-full h-11 text-sm font-bold tracking-wide rounded-lg transform active:scale-[0.98] transition-all ${queueStatus === "queued" ? "bg-zinc-800 border-zinc-700 text-zinc-500 cursor-not-allowed" : "bg-mint hover:bg-mint/90 text-ink shadow-[0_4px_15px_rgba(83,230,177,0.3)]"}`} 
+              onClick={findMatch} 
+              disabled={queueStatus === "queued"}
+            >
+              <MessageCircle className="h-4 w-4" />
+              {queueStatus === "queued" ? "Connecting Pipeline..." : "Find Someone"}
+            </Button>
+            
+            {queueStatus === "queued" && (
+              <Button className="mt-2.5 w-full h-11 text-xs font-bold bg-ink border border-coral/30 hover:border-coral text-coral transition-colors rounded-lg" variant="secondary" onClick={cancelSearch}>
+                Cancel Search
+              </Button>
+            )}
+          </div>
+
+          {notice ? (
+            <p className="mt-4 rounded-lg border border-line bg-ink/80 p-3 text-xs text-yellow-400 font-medium text-center tracking-wide animate-pulse relative z-10">
+              ⚡ {notice}
+            </p>
+          ) : null}
         </div>
-        <p className="mb-4 text-sm leading-6 text-white/62">Find someone based on your preferences and shared interests instantly.</p>
-        <Button className="w-full" onClick={findMatch} disabled={queueStatus === "queued"}>
-          <MessageCircle className="h-4 w-4" />
-          {queueStatus === "queued" ? "Finding Connection..." : "Find Someone"}
-        </Button>
-        {queueStatus === "queued" ? (
-          <Button className="mt-2 w-full" variant="secondary" onClick={cancelSearch}>
-            Cancel Search
-          </Button>
-        ) : null}
-        {notice ? <p className="mt-3 rounded-lg border border-line bg-ink p-3 text-sm text-yellow-400 font-medium">{notice}</p> : null}
-      </div> : null}
+      ) : null}
 
       {/* 🤝 Instagram Style Connections Component */}
       {showDiscover ? (
@@ -359,7 +406,6 @@ export function Dashboard({ mobileTab, onOpenChat }: DashboardProps) {
                     <div className="min-w-0">
                       <div className="flex items-center gap-1">
                         <p className="text-xs font-bold truncate">@{conn.username || conn.name}</p>
-                        {/* 🛠️ FIX: Hata diya title tag ko jo compile crash kar raha tha */}
                         <Heart className="h-2.5 w-2.5 text-rose-500 fill-rose-500" />
                       </div>
                       <p className="text-[10px] text-white/45 truncate max-w-[120px]">{conn.bio || "No bio yet"}</p>
